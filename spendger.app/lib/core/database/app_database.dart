@@ -377,11 +377,129 @@ class AppDatabase extends _$AppDatabase {
     return query.watch();
   }
 
+  Future<void> updateLoan(String id, EmiLoansCompanion loan) async {
+    await (update(emiLoans)..where((l) => l.id.equals(id))).write(loan);
+  }
+
+  Future<void> deleteLoan(String id) async {
+    await transaction(() async {
+      final allTx = await (select(transactions)..where((t) => t.tag.like('EMI:$id:%'))).get();
+      for (final tx in allTx) {
+        await deleteTransactionWithAccountUpdate(tx.id);
+      }
+      await (delete(emiPayments)..where((p) => p.loanId.equals(id))).go();
+      await (delete(emiLoans)..where((l) => l.id.equals(id))).go();
+    });
+  }
+
   Stream<List<EmiPayment>> watchPaymentsForLoan(String loanId) {
     return (select(emiPayments)
           ..where((p) => p.loanId.equals(loanId))
           ..orderBy([(p) => OrderingTerm(expression: p.installmentNumber)]))
         .watch();
+  }
+
+  Future<Transaction?> getTransactionForEmiPayment(String loanId, int installmentNumber) async {
+    final txTag = 'EMI:$loanId:$installmentNumber';
+    return (select(transactions)..where((t) => t.tag.equals(txTag))).getSingleOrNull();
+  }
+
+  Future<void> recordOrUpdateEmiPayment({
+    required String loanId,
+    required int installmentNumber,
+    required DateTime paymentDate,
+    required double principalPaid,
+    required double interestPaid,
+    required double gstPaid,
+    required double totalAmountPaid,
+    String? categoryId,
+    String? accountId,
+  }) async {
+    await transaction(() async {
+      final loan = await (select(emiLoans)..where((l) => l.id.equals(loanId))).getSingleOrNull();
+      final productName = loan?.productName ?? 'Loan';
+      final txTag = 'EMI:$loanId:$installmentNumber';
+
+      final existing = await (select(emiPayments)
+            ..where((p) => p.loanId.equals(loanId) & p.installmentNumber.equals(installmentNumber)))
+          .getSingleOrNull();
+
+      if (existing != null) {
+        await (update(emiPayments)..where((p) => p.id.equals(existing.id))).write(
+          EmiPaymentsCompanion(
+            paymentDate: Value(paymentDate),
+            principalPaid: Value(principalPaid),
+            interestPaid: Value(interestPaid),
+            gstPaid: Value(gstPaid),
+            totalAmountPaid: Value(totalAmountPaid),
+          ),
+        );
+      } else {
+        const uuid = Uuid();
+        await into(emiPayments).insert(
+          EmiPaymentsCompanion.insert(
+            id: uuid.v4(),
+            loanId: loanId,
+            installmentNumber: installmentNumber,
+            paymentDate: paymentDate,
+            principalPaid: principalPaid,
+            interestPaid: interestPaid,
+            gstPaid: Value(gstPaid),
+            totalAmountPaid: totalAmountPaid,
+          ),
+        );
+      }
+
+      // Sync with Expense Ledger (Transactions table)
+      if (categoryId != null && categoryId.isNotEmpty) {
+        final existingTx = await (select(transactions)..where((t) => t.tag.equals(txTag))).getSingleOrNull();
+        if (existingTx != null) {
+          // Update existing transaction & adjust account balance
+          await updateTransactionWithAccountUpdate(
+            existingTx,
+            TransactionsCompanion(
+              id: Value(existingTx.id),
+              categoryId: Value(categoryId),
+              accountId: Value(accountId),
+              amount: Value(totalAmountPaid),
+              type: const Value('expense'),
+              transactionDate: Value(paymentDate),
+              notes: Value('EMI Payment for $productName (Month #$installmentNumber)'),
+              tag: Value(txTag),
+            ),
+          );
+        } else {
+          // Insert new transaction & update account balance
+          const uuid = Uuid();
+          await addTransactionWithAccountUpdate(
+            TransactionsCompanion.insert(
+              id: uuid.v4(),
+              categoryId: categoryId,
+              accountId: Value(accountId),
+              amount: totalAmountPaid,
+              type: 'expense',
+              transactionDate: paymentDate,
+              notes: Value('EMI Payment for $productName (Month #$installmentNumber)'),
+              tag: Value(txTag),
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> deleteEmiPayment(String loanId, int installmentNumber) async {
+    await transaction(() async {
+      final txTag = 'EMI:$loanId:$installmentNumber';
+      final existingTx = await (select(transactions)..where((t) => t.tag.equals(txTag))).getSingleOrNull();
+      if (existingTx != null) {
+        await deleteTransactionWithAccountUpdate(existingTx.id);
+      }
+      await (delete(emiPayments)
+            ..where((p) => p.loanId.equals(loanId) & p.installmentNumber.equals(installmentNumber)))
+          .go();
+    });
   }
 
   // Investments & Chitty

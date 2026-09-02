@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -11,7 +12,9 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/financial_math.dart';
 
 class AddLoanDialog extends ConsumerStatefulWidget {
-  const AddLoanDialog({super.key});
+  final EmiLoan? loanToEdit;
+
+  const AddLoanDialog({super.key, this.loanToEdit});
 
   @override
   ConsumerState<AddLoanDialog> createState() => _AddLoanDialogState();
@@ -24,8 +27,28 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
   final _rateController = TextEditingController();
   final _tenureController = TextEditingController();
   final _gstController = TextEditingController(text: '0.0');
+  DateTime _startDate = DateTime.now();
 
   double _calculatedEmi = 0.0;
+  bool get _isEditing => widget.loanToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      final loan = widget.loanToEdit!;
+      _productNameController.text = loan.productName;
+      _lenderNameController.text = loan.lenderName ?? '';
+      _principalController.text = loan.principalAmount.truncateToDouble() == loan.principalAmount
+          ? loan.principalAmount.toInt().toString()
+          : loan.principalAmount.toString();
+      _rateController.text = loan.annualInterestRate.toString();
+      _tenureController.text = loan.tenureMonths.toString();
+      _gstController.text = loan.gstRateOnInterest.toString();
+      _startDate = loan.startDate;
+      _calculatedEmi = loan.monthlyEmi;
+    }
+  }
 
   @override
   void dispose() {
@@ -67,47 +90,75 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
     }
 
     final db = ref.read(databaseProvider);
-    const uuid = Uuid();
-    final loanId = uuid.v4();
-    final now = DateTime.now();
-
     final emi = FinancialMath.calculateEmi(
       principal: principal,
       annualInterestRate: rate,
       tenureMonths: tenure,
     );
 
-    await db.into(db.emiLoans).insert(
-      EmiLoansCompanion.insert(
-        id: loanId,
-        productName: productName,
+    if (_isEditing) {
+      final updatedCompanion = EmiLoansCompanion(
+        id: drift.Value(widget.loanToEdit!.id),
+        productName: drift.Value(productName),
         lenderName: drift.Value(_lenderNameController.text.trim().isEmpty ? null : _lenderNameController.text.trim()),
-        principalAmount: principal,
-        annualInterestRate: rate,
-        tenureMonths: tenure,
-        monthlyEmi: emi,
-        startDate: now,
+        principalAmount: drift.Value(principal),
+        annualInterestRate: drift.Value(rate),
+        tenureMonths: drift.Value(tenure),
+        monthlyEmi: drift.Value(emi),
+        startDate: drift.Value(_startDate),
         gstRateOnInterest: drift.Value(gstRate),
-        status: const drift.Value('active'),
-        createdAt: now,
-      ),
-    );
+        status: drift.Value(widget.loanToEdit!.status),
+        createdAt: drift.Value(widget.loanToEdit!.createdAt),
+      );
 
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('EMI Loan created successfully!'),
-          backgroundColor: AppColors.loan,
+      await db.updateLoan(widget.loanToEdit!.id, updatedCompanion);
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('EMI Loan updated successfully!'),
+            backgroundColor: AppColors.income,
+          ),
+        );
+      }
+    } else {
+      const uuid = Uuid();
+      final loanId = uuid.v4();
+      final now = DateTime.now();
+
+      await db.into(db.emiLoans).insert(
+        EmiLoansCompanion.insert(
+          id: loanId,
+          productName: productName,
+          lenderName: drift.Value(_lenderNameController.text.trim().isEmpty ? null : _lenderNameController.text.trim()),
+          principalAmount: principal,
+          annualInterestRate: rate,
+          tenureMonths: tenure,
+          monthlyEmi: emi,
+          startDate: _startDate,
+          gstRateOnInterest: drift.Value(gstRate),
+          status: const drift.Value('active'),
+          createdAt: now,
         ),
       );
+
+      if (mounted) {
+        Navigator.of(context).pop(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('EMI Loan created successfully!'),
+            backgroundColor: AppColors.loan,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add EMI Loan', style: TextStyle(fontWeight: FontWeight.bold)),
+      title: Text(_isEditing ? 'Edit EMI Loan' : 'Add New EMI Loan', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -116,21 +167,19 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
             TextField(
               controller: _productNameController,
               decoration: const InputDecoration(
-                labelText: 'Loan / Product Name',
-                hintText: 'e.g. Home Loan, iPhone 16 EMI',
+                labelText: 'Product / Loan Name (e.g., iPhone 16)',
                 prefixIcon: Icon(Icons.shopping_bag_outlined),
               ),
             ),
-            const Gap(10),
+            const Gap(12),
             TextField(
               controller: _lenderNameController,
               decoration: const InputDecoration(
-                labelText: 'Lender / Bank (Optional)',
-                hintText: 'e.g. HDFC, Chase, SBI',
-                prefixIcon: Icon(Icons.account_balance),
+                labelText: 'Lender / Bank (e.g., HDFC, Bajaj Finserv)',
+                prefixIcon: Icon(Icons.account_balance_outlined),
               ),
             ),
-            const Gap(10),
+            const Gap(12),
             TextField(
               controller: _principalController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -140,7 +189,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
                 prefixIcon: Icon(Icons.currency_rupee),
               ),
             ),
-            const Gap(10),
+            const Gap(12),
             Row(
               children: [
                 Expanded(
@@ -149,7 +198,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onChanged: (_) => _recalculateEmi(),
                     decoration: const InputDecoration(
-                      labelText: 'Interest Rate (% p.a.)',
+                      labelText: 'Annual Rate (%)',
                       prefixIcon: Icon(Icons.percent),
                     ),
                   ),
@@ -168,23 +217,55 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
                 ),
               ],
             ),
-            const Gap(10),
+            const Gap(12),
+            // Loan Start / Disbursal Date Picker
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _startDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _startDate = picked);
+                }
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Loan Start / Disbursal Date',
+                  prefixIcon: Icon(Icons.event_outlined),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      DateFormat('MMM dd, yyyy').format(_startDate),
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const Icon(Icons.edit_calendar, size: 16, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            const Gap(12),
             TextField(
               controller: _gstController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: 'GST on Interest Rate (%)',
-                hintText: 'e.g. 18.0 for India, 0 for none',
+                labelText: 'GST on Interest (%) - Optional',
                 prefixIcon: Icon(Icons.receipt_outlined),
+                helperText: 'Standard in India is 18.0% if applicable',
               ),
             ),
-            const Gap(14),
+            const Gap(16),
+            // Live Calculated EMI preview
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.loan.withValues(alpha: 0.12),
+                color: AppColors.loan.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.loan.withValues(alpha: 0.25)),
+                border: Border.all(color: AppColors.loan.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -208,7 +289,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.loan, foregroundColor: Colors.white),
           onPressed: _saveLoan,
-          child: const Text('Add Loan'),
+          child: Text(_isEditing ? 'Update Loan Details' : 'Create EMI Schedule'),
         ),
       ],
     );
