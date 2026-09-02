@@ -260,6 +260,44 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<void> updateTransactionWithAccountUpdate(Transaction oldTx, TransactionsCompanion newTx) async {
+    await transaction(() async {
+      // 1. Revert previous transaction impact on old account
+      if (oldTx.accountId != null) {
+        final oldAccount = await (select(accounts)..where((a) => a.id.equals(oldTx.accountId!))).getSingleOrNull();
+        if (oldAccount != null) {
+          double revertedBalance = oldAccount.currentBalance;
+          if (oldTx.type == 'income') {
+            revertedBalance -= oldTx.amount;
+          } else if (oldTx.type == 'expense') {
+            revertedBalance += oldTx.amount;
+          }
+          await (update(accounts)..where((a) => a.id.equals(oldAccount.id)))
+              .write(AccountsCompanion(currentBalance: Value(revertedBalance)));
+        }
+      }
+
+      // 2. Apply new transaction impact on new/current account
+      final newAccountId = newTx.accountId.value;
+      if (newAccountId != null) {
+        final currentAccount = await (select(accounts)..where((a) => a.id.equals(newAccountId))).getSingleOrNull();
+        if (currentAccount != null) {
+          double updatedBalance = currentAccount.currentBalance;
+          if (newTx.type.value == 'income') {
+            updatedBalance += newTx.amount.value;
+          } else if (newTx.type.value == 'expense') {
+            updatedBalance -= newTx.amount.value;
+          }
+          await (update(accounts)..where((a) => a.id.equals(currentAccount.id)))
+              .write(AccountsCompanion(currentBalance: Value(updatedBalance)));
+        }
+      }
+
+      // 3. Update the transaction row
+      await (update(transactions)..where((t) => t.id.equals(oldTx.id))).write(newTx);
+    });
+  }
+
   Future<void> deleteTransactionWithAccountUpdate(String id) async {
     await transaction(() async {
       final tx = await (select(transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -285,6 +323,48 @@ class AppDatabase extends _$AppDatabase {
   // Budgets
   Stream<List<Budget>> watchBudgetsForMonth(int year, int month) {
     return (select(budgets)..where((b) => b.periodYear.equals(year) & b.periodMonth.equals(month))).watch();
+  }
+
+  Future<void> setOrUpdateBudget({
+    required String categoryId,
+    required int year,
+    required int month,
+    required double allocatedAmount,
+    required bool rolloverEnabled,
+  }) async {
+    final existing = await (select(budgets)
+          ..where((b) => b.categoryId.equals(categoryId) & b.periodYear.equals(year) & b.periodMonth.equals(month)))
+        .getSingleOrNull();
+
+    if (existing != null) {
+      await (update(budgets)..where((b) => b.id.equals(existing.id))).write(
+        BudgetsCompanion(
+          allocatedAmount: Value(allocatedAmount),
+          rolloverEnabled: Value(rolloverEnabled),
+        ),
+      );
+    } else {
+      const uuid = Uuid();
+      await into(budgets).insert(
+        BudgetsCompanion.insert(
+          id: uuid.v4(),
+          categoryId: categoryId,
+          allocatedAmount: allocatedAmount,
+          periodMonth: month,
+          periodYear: year,
+          rolloverEnabled: Value(rolloverEnabled),
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+  }
+
+  Future<void> upsertCategory(CategoriesCompanion cat) async {
+    await into(categories).insertOnConflictUpdate(cat);
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await (delete(categories)..where((c) => c.id.equals(id))).go();
   }
 
   // EMI Loans & Payments

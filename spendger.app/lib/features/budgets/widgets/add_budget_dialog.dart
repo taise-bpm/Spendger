@@ -1,8 +1,6 @@
-import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/app_database.dart';
@@ -12,8 +10,14 @@ import '../../../core/utils/icon_helper.dart';
 class AddBudgetDialog extends ConsumerStatefulWidget {
   final int year;
   final int month;
+  final Budget? budgetToEdit;
 
-  const AddBudgetDialog({super.key, required this.year, required this.month});
+  const AddBudgetDialog({
+    super.key,
+    required this.year,
+    required this.month,
+    this.budgetToEdit,
+  });
 
   @override
   ConsumerState<AddBudgetDialog> createState() => _AddBudgetDialogState();
@@ -23,6 +27,21 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
   String? _selectedCategoryId;
   final TextEditingController _amountController = TextEditingController();
   bool _rolloverEnabled = false;
+
+  bool get _isEditing => widget.budgetToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      final b = widget.budgetToEdit!;
+      _selectedCategoryId = b.categoryId;
+      _amountController.text = b.allocatedAmount.truncateToDouble() == b.allocatedAmount
+          ? b.allocatedAmount.toInt().toString()
+          : b.allocatedAmount.toString();
+      _rolloverEnabled = b.rolloverEnabled;
+    }
+  }
 
   @override
   void dispose() {
@@ -47,33 +66,23 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
     }
 
     final db = ref.read(databaseProvider);
-    const uuid = Uuid();
 
-    try {
-      await db.into(db.budgets).insert(
-        BudgetsCompanion.insert(
-          id: uuid.v4(),
-          categoryId: _selectedCategoryId!,
-          allocatedAmount: amount,
-          periodMonth: widget.month,
-          periodYear: widget.year,
-          rolloverEnabled: drift.Value(_rolloverEnabled),
-          createdAt: DateTime.now(),
+    await db.setOrUpdateBudget(
+      categoryId: _selectedCategoryId!,
+      year: widget.year,
+      month: widget.month,
+      allocatedAmount: amount,
+      rolloverEnabled: _rolloverEnabled,
+    );
+
+    if (mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isEditing ? 'Budget updated successfully!' : 'Budget saved successfully!'),
+          backgroundColor: AppColors.income,
         ),
       );
-
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Budget created successfully!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A budget for this category already exists this month.')),
-        );
-      }
     }
   }
 
@@ -87,7 +96,7 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
     }
 
     return AlertDialog(
-      title: const Text('Set Category Budget', style: TextStyle(fontWeight: FontWeight.bold)),
+      title: Text(_isEditing ? 'Edit Category Budget' : 'Set Category Budget', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -97,6 +106,7 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
             const Gap(6),
             DropdownButtonFormField<String>(
               initialValue: _selectedCategoryId,
+              isExpanded: true,
               items: categories.map((cat) {
                 return DropdownMenuItem(
                   value: cat.id,
@@ -108,12 +118,19 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
                         color: Color(cat.colorValue),
                       ),
                       const Gap(8),
-                      Text(cat.name),
+                      Expanded(
+                        child: Text(
+                          cat.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 );
               }).toList(),
-              onChanged: (val) => setState(() => _selectedCategoryId = val),
+              onChanged: _isEditing
+                  ? null // Category is locked during edit
+                  : (val) => setState(() => _selectedCategoryId = val),
             ),
             const Gap(16),
             TextField(
@@ -144,7 +161,7 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
           onPressed: _saveBudget,
-          child: const Text('Save Budget'),
+          child: Text(_isEditing ? 'Update Budget' : 'Save Budget'),
         ),
       ],
     );

@@ -228,69 +228,82 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                         },
                         child: Card(
                           margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    if (cat != null)
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Color(cat.colorValue).withValues(alpha: 0.15),
-                                        child: Icon(
-                                          IconHelper.getIcon(cat.iconCode),
-                                          size: 18,
-                                          color: Color(cat.colorValue),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => AddBudgetDialog(
+                                  year: _currentMonth.year,
+                                  month: _currentMonth.month,
+                                  budgetToEdit: b,
+                                ),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      if (cat != null)
+                                        CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: Color(cat.colorValue).withValues(alpha: 0.15),
+                                          child: Icon(
+                                            IconHelper.getIcon(cat.iconCode),
+                                            size: 18,
+                                            color: Color(cat.colorValue),
+                                          ),
+                                        ),
+                                      const Gap(12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              cat?.name ?? 'Category',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                            ),
+                                            Text(
+                                              statusText,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: statusColor,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    const Gap(12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
                                           Text(
-                                            cat?.name ?? 'Category',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                            '${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(b.allocatedAmount)}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                           ),
                                           Text(
-                                            statusText,
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                              color: statusColor,
-                                            ),
+                                            '${(ratio * 100).toStringAsFixed(0)}%',
+                                            style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.bold),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          '${CurrencyFormatter.format(spent)} / ${CurrencyFormatter.format(b.allocatedAmount)}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
-                                        Text(
-                                          '${(ratio * 100).toStringAsFixed(0)}%',
-                                          style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.bold),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const Gap(12),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: ratio.clamp(0.0, 1.0),
-                                    minHeight: 8,
-                                    backgroundColor: statusColor.withValues(alpha: 0.15),
-                                    valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const Gap(12),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: LinearProgressIndicator(
+                                      value: ratio.clamp(0.0, 1.0),
+                                      minHeight: 8,
+                                      backgroundColor: statusColor.withValues(alpha: 0.15),
+                                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -301,6 +314,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_budgets',
         backgroundColor: AppColors.primary,
         onPressed: () {
           showDialog(

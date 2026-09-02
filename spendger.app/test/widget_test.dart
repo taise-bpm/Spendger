@@ -10,7 +10,14 @@ void main() {
       ),
     );
 
-    // Verify app starts and renders Spendger
+    // Initial splash screen renders SPENDGER
+    expect(find.text('SPENDGER'), findsOneWidget);
+
+    // Fast-forward animation & timer
+    await tester.pump(const Duration(milliseconds: 2500));
+    await tester.pumpAndSettle();
+
+    // Verify main shell renders
     expect(find.text('Spendger'), findsOneWidget);
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Ledger'), findsOneWidget);

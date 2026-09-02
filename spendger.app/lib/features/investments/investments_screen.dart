@@ -84,20 +84,27 @@ class InvestmentsScreen extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'TOTAL INVESTMENT VALUATION',
-                          style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                        ),
-                        const Gap(4),
-                        Text(
-                          CurrencyFormatter.format(totalValuation),
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'TOTAL INVESTMENT VALUATION',
+                            style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          const Gap(4),
+                          Text(
+                            CurrencyFormatter.format(totalValuation),
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
                     ),
+                    const Gap(8),
                     const Icon(Icons.auto_graph, color: AppColors.investment, size: 28),
                   ],
                 ),

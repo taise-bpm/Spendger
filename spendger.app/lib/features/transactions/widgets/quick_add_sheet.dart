@@ -9,10 +9,17 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/utils/icon_helper.dart';
+import '../../settings/category_manager_screen.dart';
 
 class QuickAddSheet extends ConsumerStatefulWidget {
   final String initialType;
-  const QuickAddSheet({super.key, this.initialType = 'expense'});
+  final Transaction? transactionToEdit;
+
+  const QuickAddSheet({
+    super.key,
+    this.initialType = 'expense',
+    this.transactionToEdit,
+  });
 
   @override
   ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
@@ -26,10 +33,24 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _notesController = TextEditingController();
 
+  bool get _isEditing => widget.transactionToEdit != null;
+
   @override
   void initState() {
     super.initState();
-    _type = widget.initialType;
+    if (_isEditing) {
+      final tx = widget.transactionToEdit!;
+      _type = tx.type;
+      _amountStr = tx.amount.truncateToDouble() == tx.amount
+          ? tx.amount.toInt().toString()
+          : tx.amount.toString();
+      _selectedCategoryId = tx.categoryId;
+      _selectedAccountId = tx.accountId;
+      _selectedDate = tx.transactionDate;
+      _notesController.text = tx.notes ?? '';
+    } else {
+      _type = widget.initialType;
+    }
   }
 
   @override
@@ -81,24 +102,41 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     final db = ref.read(databaseProvider);
     const uuid = Uuid();
 
-    final tx = TransactionsCompanion.insert(
-      id: uuid.v4(),
-      categoryId: _selectedCategoryId!,
-      accountId: drift.Value(_selectedAccountId),
-      amount: amount,
-      type: _type,
-      transactionDate: _selectedDate,
-      notes: drift.Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
-      createdAt: DateTime.now(),
-    );
-
-    await db.addTransactionWithAccountUpdate(tx);
+    if (_isEditing) {
+      final updatedTx = TransactionsCompanion(
+        id: drift.Value(widget.transactionToEdit!.id),
+        categoryId: drift.Value(_selectedCategoryId!),
+        accountId: drift.Value(_selectedAccountId),
+        amount: drift.Value(amount),
+        type: drift.Value(_type),
+        transactionDate: drift.Value(_selectedDate),
+        notes: drift.Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
+        createdAt: drift.Value(widget.transactionToEdit!.createdAt),
+      );
+      await db.updateTransactionWithAccountUpdate(widget.transactionToEdit!, updatedTx);
+    } else {
+      final tx = TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: _selectedCategoryId!,
+        accountId: drift.Value(_selectedAccountId),
+        amount: amount,
+        type: _type,
+        transactionDate: _selectedDate,
+        notes: drift.Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
+        createdAt: DateTime.now(),
+      );
+      await db.addTransactionWithAccountUpdate(tx);
+    }
 
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${_type == 'income' ? 'Income' : 'Expense'} recorded successfully!'),
+          content: Text(
+            _isEditing
+                ? '${_type == 'income' ? 'Income' : 'Expense'} updated successfully!'
+                : '${_type == 'income' ? 'Income' : 'Expense'} recorded successfully!',
+          ),
           backgroundColor: _type == 'income' ? AppColors.income : AppColors.expense,
         ),
       );
@@ -121,191 +159,246 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     }
 
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 14,
+        bottom: bottomInset > 0 ? bottomInset + 8 : 16,
+      ),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
-        children: [
-          // Drag handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const Gap(12),
-          // Type Selector Switch
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: theme.cardTheme.color,
-              borderRadius: BorderRadius.circular(14),
+            const Gap(12),
+            // Header Title / Edit indicator
+            if (_isEditing)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.edit, size: 16, color: AppColors.primaryLight),
+                    const Gap(6),
+                    Text(
+                      'Edit Transaction',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Type Selector Switch
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: theme.cardTheme.color,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTypeButton(
+                      label: 'Expense',
+                      type: 'expense',
+                      color: AppColors.expense,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildTypeButton(
+                      label: 'Income',
+                      type: 'income',
+                      color: AppColors.income,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
+            const Gap(16),
+            // Amount Display Header
+            Text(
+              _type.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+                color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
+              ),
+            ),
+            const Gap(4),
+            Text(
+              '₹ $_amountStr',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w800,
+                color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
+              ),
+            ),
+            const Gap(14),
+            // Category horizontal scroll
+            SizedBox(
+              height: 42,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: categories.length + 1,
+                separatorBuilder: (_, __) => const Gap(8),
+                itemBuilder: (context, index) {
+                  if (index == categories.length) {
+                    return ActionChip(
+                      avatar: const Icon(Icons.settings, size: 15, color: AppColors.primaryLight),
+                      label: const Text('Manage Heads', style: TextStyle(fontSize: 12, color: AppColors.primaryLight)),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
+                        );
+                      },
+                    );
+                  }
+                  final cat = categories[index];
+                  final isSelected = cat.id == _selectedCategoryId;
+                  return ChoiceChip(
+                    avatar: Icon(
+                      IconHelper.getIcon(cat.iconCode),
+                      size: 16,
+                      color: isSelected ? Colors.white : Color(cat.colorValue),
+                    ),
+                    label: Text(cat.name),
+                    selected: isSelected,
+                    selectedColor: Color(cat.colorValue),
+                    onSelected: (val) {
+                      setState(() => _selectedCategoryId = cat.id);
+                    },
+                  );
+                },
+              ),
+            ),
+            const Gap(10),
+            // Account & Date Selector Row
+            Row(
               children: [
                 Expanded(
-                  child: _buildTypeButton(
-                    label: 'Expense',
-                    type: 'expense',
-                    color: AppColors.expense,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedAccountId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Account / Mode',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    items: accounts.map((acc) {
+                      return DropdownMenuItem(
+                        value: acc.id,
+                        child: Row(
+                          children: [
+                            Icon(
+                              IconHelper.getIcon(acc.iconCode),
+                              size: 16,
+                              color: Color(acc.colorValue),
+                            ),
+                            const Gap(6),
+                            Expanded(
+                              child: Text(
+                                acc.name,
+                                style: const TextStyle(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedAccountId = val),
                   ),
                 ),
+                const Gap(10),
                 Expanded(
-                  child: _buildTypeButton(
-                    label: 'Income',
-                    type: 'income',
-                    color: AppColors.income,
+                  child: InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                      );
+                      if (picked != null) setState(() => _selectedDate = picked);
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Date',
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              DateFormat('MMM dd, yyyy').format(_selectedDate),
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const Gap(4),
+                          const Icon(Icons.calendar_today, size: 14),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-          const Gap(16),
-          // Amount Display Header
-          Text(
-            _type.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
+            const Gap(10),
+            // Optional Notes
+            TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                hintText: 'Notes (Optional)',
+                prefixIcon: Icon(Icons.edit_note, size: 20),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
             ),
-          ),
-          const Gap(4),
-          Text(
-            '₹ $_amountStr',
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w800,
-              color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
+            const Gap(10),
+            // Keypad Grid
+            Expanded(
+              child: _buildKeypadGrid(),
             ),
-          ),
-          const Gap(14),
-          // Category horizontal scroll
-          SizedBox(
-            height: 42,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: categories.length,
-              separatorBuilder: (_, __) => const Gap(8),
-              itemBuilder: (context, index) {
-                final cat = categories[index];
-                final isSelected = cat.id == _selectedCategoryId;
-                return ChoiceChip(
-                  avatar: Icon(
-                    IconHelper.getIcon(cat.iconCode),
-                    size: 16,
-                    color: isSelected ? Colors.white : Color(cat.colorValue),
-                  ),
-                  label: Text(cat.name),
-                  selected: isSelected,
-                  selectedColor: Color(cat.colorValue),
-                  onSelected: (val) {
-                    setState(() => _selectedCategoryId = cat.id);
-                  },
-                );
-              },
-            ),
-          ),
-          const Gap(10),
-          // Account & Date Selector Row
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedAccountId,
-                  decoration: const InputDecoration(
-                    labelText: 'Account / Mode',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  items: accounts.map((acc) {
-                    return DropdownMenuItem(
-                      value: acc.id,
-                      child: Row(
-                        children: [
-                          Icon(
-                            IconHelper.getIcon(acc.iconCode),
-                            size: 16,
-                            color: Color(acc.colorValue),
-                          ),
-                          const Gap(8),
-                          Text(acc.name, style: const TextStyle(fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) => setState(() => _selectedAccountId = val),
+            // Save / Update Button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _type == 'income' ? AppColors.income : AppColors.expense,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: _submitTransaction,
+                child: Text(
+                  _isEditing ? 'UPDATE TRANSACTION' : 'SAVE TRANSACTION',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
-              const Gap(10),
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) setState(() => _selectedDate = picked);
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Date',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('MMM dd, yyyy').format(_selectedDate),
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        const Icon(Icons.calendar_today, size: 14),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Gap(10),
-          // Optional Notes
-          TextField(
-            controller: _notesController,
-            decoration: const InputDecoration(
-              hintText: 'Notes (Optional)',
-              prefixIcon: Icon(Icons.edit_note, size: 20),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
-          ),
-          const Gap(10),
-          // Keypad Grid
-          Expanded(
-            child: _buildKeypadGrid(),
-          ),
-          // Save Button
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _type == 'income' ? AppColors.income : AppColors.expense,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: _submitTransaction,
-              child: const Text('SAVE TRANSACTION', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

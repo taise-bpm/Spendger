@@ -6,6 +6,8 @@ import '../../app/theme/app_colors.dart';
 import '../../core/providers/database_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/providers/theme_provider.dart';
+import 'category_manager_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -103,11 +105,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Gap(20),
 
           // Currency & Preferences
-          Text('PREFERENCES', style: theme.textTheme.labelMedium?.copyWith(color: Colors.grey, letterSpacing: 1.1)),
+          Text('PREFERENCES & APPEARANCE', style: theme.textTheme.labelMedium?.copyWith(color: Colors.grey, letterSpacing: 1.1)),
           const Gap(8),
           Card(
             child: Column(
               children: [
+                Consumer(
+                  builder: (context, ref, _) {
+                    final currentThemeMode = ref.watch(themeModeProvider);
+                    return ListTile(
+                      leading: Icon(
+                        currentThemeMode == ThemeMode.dark
+                            ? Icons.dark_mode_outlined
+                            : (currentThemeMode == ThemeMode.light ? Icons.light_mode_outlined : Icons.brightness_auto_outlined),
+                        color: AppColors.primaryLight,
+                      ),
+                      title: const Text('Theme Appearance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(
+                        currentThemeMode == ThemeMode.dark
+                            ? 'Dark Mode (OLED Deep Navy)'
+                            : (currentThemeMode == ThemeMode.light ? 'Light Mode (Clean Slate)' : 'System Default'),
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      trailing: DropdownButton<ThemeMode>(
+                        value: currentThemeMode,
+                        underline: const SizedBox.shrink(),
+                        items: const [
+                          DropdownMenuItem(
+                            value: ThemeMode.dark,
+                            child: Row(
+                              children: [
+                                Icon(Icons.dark_mode, size: 16),
+                                Gap(8),
+                                Text('Dark'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.light,
+                            child: Row(
+                              children: [
+                                Icon(Icons.light_mode, size: 16),
+                                Gap(8),
+                                Text('Light'),
+                              ],
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.system,
+                            child: Row(
+                              children: [
+                                Icon(Icons.brightness_auto, size: 16),
+                                Gap(8),
+                                Text('System'),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (newMode) {
+                          if (newMode != null) {
+                            ref.read(themeModeProvider.notifier).state = newMode;
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.category_outlined, color: AppColors.primaryLight),
+                  title: const Text('Manage Categories & Headers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Add, rename, customize icons & colors for Income and Expenses', style: TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.currency_exchange, color: AppColors.loanLight),
                   title: const Text('Currency Symbol', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
@@ -212,13 +288,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Center(
             child: Column(
               children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(25),
+                    child: Image.asset(
+                      'assets/images/spendger.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.wallet, size: 28, color: AppColors.primaryLight),
+                    ),
+                  ),
+                ),
+                const Gap(8),
                 Text(
-                  'Spendger v1.0.0 (Offline-First)',
-                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey, fontWeight: FontWeight.bold),
+                  'Spendger v1.0.0',
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const Gap(2),
                 Text(
-                  'Built with Flutter 3.x & Drift SQLite Engine',
+                  '100% Offline • Private SQLite Storage',
                   style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                 ),
               ],

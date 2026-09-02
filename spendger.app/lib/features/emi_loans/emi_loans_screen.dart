@@ -60,35 +60,47 @@ class EmiLoansScreen extends ConsumerWidget {
                   ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'TOTAL ACTIVE PRINCIPAL',
-                          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                        ),
-                        const Gap(4),
-                        Text(
-                          CurrencyFormatter.format(totalActiveDebt),
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'ACTIVE PRINCIPAL',
+                            style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          const Gap(4),
+                          Text(
+                            CurrencyFormatter.format(totalActiveDebt),
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text(
-                          'COMBINED MONTHLY EMI',
-                          style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                        ),
-                        const Gap(4),
-                        Text(
-                          CurrencyFormatter.format(totalMonthlyEmi),
-                          style: const TextStyle(color: AppColors.loanLight, fontSize: 18, fontWeight: FontWeight.w800),
-                        ),
-                      ],
+                    const Gap(12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'MONTHLY EMI',
+                            style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          const Gap(4),
+                          Text(
+                            CurrencyFormatter.format(totalMonthlyEmi),
+                            style: const TextStyle(color: AppColors.loanLight, fontSize: 18, fontWeight: FontWeight.w800),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -142,32 +154,34 @@ class EmiLoansScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 18,
-                                          backgroundColor: AppColors.loan.withValues(alpha: 0.2),
-                                          child: const Icon(Icons.account_balance, size: 18, color: AppColors.loanLight),
-                                        ),
-                                        const Gap(10),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              loan.productName,
-                                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                            ),
-                                            if (loan.lenderName != null)
-                                              Text(
-                                                loan.lenderName!,
-                                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
+                                    CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: AppColors.loan.withValues(alpha: 0.2),
+                                      child: const Icon(Icons.account_balance, size: 18, color: AppColors.loanLight),
                                     ),
+                                    const Gap(10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            loan.productName,
+                                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                          if (loan.lenderName != null)
+                                            Text(
+                                              loan.lenderName!,
+                                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              overflow: TextOverflow.ellipsis,
+                                              maxLines: 1,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Gap(10),
                                     Column(
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
@@ -208,6 +222,7 @@ class EmiLoansScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_loans',
         backgroundColor: AppColors.loan,
         onPressed: () {
           showDialog(

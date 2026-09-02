@@ -39,15 +39,23 @@ class _EarlyPayoffSimulatorSheetState extends State<EarlyPayoffSimulatorSheet> {
     );
 
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 14,
+        bottom: bottomInset > 0 ? bottomInset + 8 : 16,
+      ),
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: Column(
+      child: SafeArea(
+        top: false,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
@@ -220,8 +228,9 @@ class _EarlyPayoffSimulatorSheetState extends State<EarlyPayoffSimulatorSheet> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildComparisonRow(String metric, String val1, String val2, {bool isHeader = false, bool highlightValue = false}) {
     return Padding(

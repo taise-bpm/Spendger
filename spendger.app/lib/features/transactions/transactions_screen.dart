@@ -191,6 +191,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_transactions',
         backgroundColor: AppColors.primary,
         onPressed: () {
           showModalBottomSheet(

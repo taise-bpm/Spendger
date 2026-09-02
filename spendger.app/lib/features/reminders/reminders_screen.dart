@@ -176,6 +176,7 @@ class RemindersScreen extends ConsumerWidget {
               },
             ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_reminders',
         backgroundColor: AppColors.primary,
         onPressed: () => _showAddReminderDialog(context, ref),
         child: const Icon(Icons.add, color: Colors.white, size: 28),
