@@ -4,7 +4,9 @@ import 'package:local_auth/local_auth.dart';
 class BiometricService {
   static final LocalAuthentication _auth = LocalAuthentication();
   static bool isAppLocked = false;
-  static bool isBiometricEnabled = false;
+  static bool cachedBiometricEnabled = false;
+
+  static bool get isBiometricEnabled => cachedBiometricEnabled;
 
   static Future<bool> canAuthenticate() async {
     try {
@@ -19,10 +21,10 @@ class BiometricService {
   static Future<bool> authenticate() async {
     try {
       final canAuth = await canAuthenticate();
-      if (!canAuth) return true; // If not available, bypass gracefully
+      if (!canAuth) return true; // If not available on hardware, bypass gracefully
 
       return await _auth.authenticate(
-        localizedReason: 'Please authenticate to unlock Spendger',
+        localizedReason: 'Please authenticate with Biometrics or Device PIN to open Spendger',
         options: const AuthenticationOptions(
           stickyAuth: true,
           biometricOnly: false,

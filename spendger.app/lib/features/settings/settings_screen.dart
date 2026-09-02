@@ -7,6 +7,7 @@ import '../../core/providers/database_provider.dart';
 import '../../core/services/biometric_service.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../core/services/preferences_service.dart';
 import 'category_manager_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -22,7 +23,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _biometricEnabled = BiometricService.isBiometricEnabled;
+    _biometricEnabled = PreferencesService.isBiometricEnabled;
   }
 
   @override
@@ -86,15 +87,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     if (val) {
                       final authenticated = await BiometricService.authenticate();
                       if (authenticated) {
+                        await PreferencesService.setBiometricEnabled(true);
                         setState(() {
                           _biometricEnabled = true;
-                          BiometricService.isBiometricEnabled = true;
                         });
                       }
                     } else {
+                      await PreferencesService.setBiometricEnabled(false);
                       setState(() {
                         _biometricEnabled = false;
-                        BiometricService.isBiometricEnabled = false;
                       });
                     }
                   },
@@ -164,7 +165,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ],
                         onChanged: (newMode) {
                           if (newMode != null) {
-                            ref.read(themeModeProvider.notifier).state = newMode;
+                            ref.read(themeModeProvider.notifier).setThemeMode(newMode);
                           }
                         },
                       ),
@@ -198,11 +199,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       DropdownMenuItem(value: '£', child: Text('£ (GBP)')),
                       DropdownMenuItem(value: 'AED', child: Text('AED (Dirham)')),
                     ],
-                    onChanged: (val) {
+                    onChanged: (val) async {
                       if (val != null) {
-                        setState(() {
-                          CurrencyFormatter.currencySymbol = val;
-                        });
+                        await PreferencesService.setCurrencySymbol(val);
+                        setState(() {});
                       }
                     },
                   ),

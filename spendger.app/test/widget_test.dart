@@ -1,8 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spendger/app/app.dart';
+import 'package:spendger/core/services/preferences_service.dart';
 
 void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await PreferencesService.init();
+  });
+
   testWidgets('Spendger app smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
