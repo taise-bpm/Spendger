@@ -9,6 +9,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/services/preferences_service.dart';
 import 'category_manager_screen.dart';
+import '../accounts/accounts_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -169,6 +170,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           }
                         },
                       ),
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.incomeLight),
+                  title: const Text('Bank Accounts & Credit Cards', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Manage Bank Accounts, Credit Limits, Cash & perform Self-Transfers', style: TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AccountsScreen()),
                     );
                   },
                 ),

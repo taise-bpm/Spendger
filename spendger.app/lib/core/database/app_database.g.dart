@@ -82,7 +82,8 @@ class $CategoriesTable extends Categories
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -154,8 +155,6 @@ class $CategoriesTable extends Categories
         _createdAtMeta,
         createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
     }
     return context;
   }
@@ -361,14 +360,13 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
     required int iconCode,
     required int colorValue,
     this.isCustom = const Value.absent(),
-    required DateTime createdAt,
+    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
        type = Value(type),
        iconCode = Value(iconCode),
-       colorValue = Value(colorValue),
-       createdAt = Value(createdAt);
+       colorValue = Value(colorValue);
   static Insertable<Category> custom({
     Expression<String>? id,
     Expression<String>? name,
@@ -505,6 +503,17 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0.0),
   );
+  static const VerificationMeta _creditLimitMeta = const VerificationMeta(
+    'creditLimit',
+  );
+  @override
+  late final GeneratedColumn<double> creditLimit = GeneratedColumn<double>(
+    'credit_limit',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _iconCodeMeta = const VerificationMeta(
     'iconCode',
   );
@@ -533,6 +542,7 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     name,
     accountType,
     currentBalance,
+    creditLimit,
     iconCode,
     colorValue,
   ];
@@ -581,6 +591,15 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         ),
       );
     }
+    if (data.containsKey('credit_limit')) {
+      context.handle(
+        _creditLimitMeta,
+        creditLimit.isAcceptableOrUnknown(
+          data['credit_limit']!,
+          _creditLimitMeta,
+        ),
+      );
+    }
     if (data.containsKey('icon_code')) {
       context.handle(
         _iconCodeMeta,
@@ -622,6 +641,10 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         DriftSqlType.double,
         data['${effectivePrefix}current_balance'],
       )!,
+      creditLimit: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}credit_limit'],
+      ),
       iconCode: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}icon_code'],
@@ -644,6 +667,7 @@ class Account extends DataClass implements Insertable<Account> {
   final String name;
   final String accountType;
   final double currentBalance;
+  final double? creditLimit;
   final int iconCode;
   final int colorValue;
   const Account({
@@ -651,6 +675,7 @@ class Account extends DataClass implements Insertable<Account> {
     required this.name,
     required this.accountType,
     required this.currentBalance,
+    this.creditLimit,
     required this.iconCode,
     required this.colorValue,
   });
@@ -661,6 +686,9 @@ class Account extends DataClass implements Insertable<Account> {
     map['name'] = Variable<String>(name);
     map['account_type'] = Variable<String>(accountType);
     map['current_balance'] = Variable<double>(currentBalance);
+    if (!nullToAbsent || creditLimit != null) {
+      map['credit_limit'] = Variable<double>(creditLimit);
+    }
     map['icon_code'] = Variable<int>(iconCode);
     map['color_value'] = Variable<int>(colorValue);
     return map;
@@ -672,6 +700,9 @@ class Account extends DataClass implements Insertable<Account> {
       name: Value(name),
       accountType: Value(accountType),
       currentBalance: Value(currentBalance),
+      creditLimit: creditLimit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(creditLimit),
       iconCode: Value(iconCode),
       colorValue: Value(colorValue),
     );
@@ -687,6 +718,7 @@ class Account extends DataClass implements Insertable<Account> {
       name: serializer.fromJson<String>(json['name']),
       accountType: serializer.fromJson<String>(json['accountType']),
       currentBalance: serializer.fromJson<double>(json['currentBalance']),
+      creditLimit: serializer.fromJson<double?>(json['creditLimit']),
       iconCode: serializer.fromJson<int>(json['iconCode']),
       colorValue: serializer.fromJson<int>(json['colorValue']),
     );
@@ -699,6 +731,7 @@ class Account extends DataClass implements Insertable<Account> {
       'name': serializer.toJson<String>(name),
       'accountType': serializer.toJson<String>(accountType),
       'currentBalance': serializer.toJson<double>(currentBalance),
+      'creditLimit': serializer.toJson<double?>(creditLimit),
       'iconCode': serializer.toJson<int>(iconCode),
       'colorValue': serializer.toJson<int>(colorValue),
     };
@@ -709,6 +742,7 @@ class Account extends DataClass implements Insertable<Account> {
     String? name,
     String? accountType,
     double? currentBalance,
+    Value<double?> creditLimit = const Value.absent(),
     int? iconCode,
     int? colorValue,
   }) => Account(
@@ -716,6 +750,7 @@ class Account extends DataClass implements Insertable<Account> {
     name: name ?? this.name,
     accountType: accountType ?? this.accountType,
     currentBalance: currentBalance ?? this.currentBalance,
+    creditLimit: creditLimit.present ? creditLimit.value : this.creditLimit,
     iconCode: iconCode ?? this.iconCode,
     colorValue: colorValue ?? this.colorValue,
   );
@@ -729,6 +764,9 @@ class Account extends DataClass implements Insertable<Account> {
       currentBalance: data.currentBalance.present
           ? data.currentBalance.value
           : this.currentBalance,
+      creditLimit: data.creditLimit.present
+          ? data.creditLimit.value
+          : this.creditLimit,
       iconCode: data.iconCode.present ? data.iconCode.value : this.iconCode,
       colorValue: data.colorValue.present
           ? data.colorValue.value
@@ -743,6 +781,7 @@ class Account extends DataClass implements Insertable<Account> {
           ..write('name: $name, ')
           ..write('accountType: $accountType, ')
           ..write('currentBalance: $currentBalance, ')
+          ..write('creditLimit: $creditLimit, ')
           ..write('iconCode: $iconCode, ')
           ..write('colorValue: $colorValue')
           ..write(')'))
@@ -750,8 +789,15 @@ class Account extends DataClass implements Insertable<Account> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, accountType, currentBalance, iconCode, colorValue);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    accountType,
+    currentBalance,
+    creditLimit,
+    iconCode,
+    colorValue,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -760,6 +806,7 @@ class Account extends DataClass implements Insertable<Account> {
           other.name == this.name &&
           other.accountType == this.accountType &&
           other.currentBalance == this.currentBalance &&
+          other.creditLimit == this.creditLimit &&
           other.iconCode == this.iconCode &&
           other.colorValue == this.colorValue);
 }
@@ -769,6 +816,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<String> name;
   final Value<String> accountType;
   final Value<double> currentBalance;
+  final Value<double?> creditLimit;
   final Value<int> iconCode;
   final Value<int> colorValue;
   final Value<int> rowid;
@@ -777,6 +825,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.name = const Value.absent(),
     this.accountType = const Value.absent(),
     this.currentBalance = const Value.absent(),
+    this.creditLimit = const Value.absent(),
     this.iconCode = const Value.absent(),
     this.colorValue = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -786,6 +835,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     required String name,
     required String accountType,
     this.currentBalance = const Value.absent(),
+    this.creditLimit = const Value.absent(),
     required int iconCode,
     required int colorValue,
     this.rowid = const Value.absent(),
@@ -799,6 +849,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Expression<String>? name,
     Expression<String>? accountType,
     Expression<double>? currentBalance,
+    Expression<double>? creditLimit,
     Expression<int>? iconCode,
     Expression<int>? colorValue,
     Expression<int>? rowid,
@@ -808,6 +859,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       if (name != null) 'name': name,
       if (accountType != null) 'account_type': accountType,
       if (currentBalance != null) 'current_balance': currentBalance,
+      if (creditLimit != null) 'credit_limit': creditLimit,
       if (iconCode != null) 'icon_code': iconCode,
       if (colorValue != null) 'color_value': colorValue,
       if (rowid != null) 'rowid': rowid,
@@ -819,6 +871,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Value<String>? name,
     Value<String>? accountType,
     Value<double>? currentBalance,
+    Value<double?>? creditLimit,
     Value<int>? iconCode,
     Value<int>? colorValue,
     Value<int>? rowid,
@@ -828,6 +881,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       name: name ?? this.name,
       accountType: accountType ?? this.accountType,
       currentBalance: currentBalance ?? this.currentBalance,
+      creditLimit: creditLimit ?? this.creditLimit,
       iconCode: iconCode ?? this.iconCode,
       colorValue: colorValue ?? this.colorValue,
       rowid: rowid ?? this.rowid,
@@ -849,6 +903,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     if (currentBalance.present) {
       map['current_balance'] = Variable<double>(currentBalance.value);
     }
+    if (creditLimit.present) {
+      map['credit_limit'] = Variable<double>(creditLimit.value);
+    }
     if (iconCode.present) {
       map['icon_code'] = Variable<int>(iconCode.value);
     }
@@ -868,6 +925,7 @@ class AccountsCompanion extends UpdateCompanion<Account> {
           ..write('name: $name, ')
           ..write('accountType: $accountType, ')
           ..write('currentBalance: $currentBalance, ')
+          ..write('creditLimit: $creditLimit, ')
           ..write('iconCode: $iconCode, ')
           ..write('colorValue: $colorValue, ')
           ..write('rowid: $rowid')
@@ -911,6 +969,20 @@ class $TransactionsTable extends Transactions
   @override
   late final GeneratedColumn<String> accountId = GeneratedColumn<String>(
     'account_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES accounts (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _toAccountIdMeta = const VerificationMeta(
+    'toAccountId',
+  );
+  @override
+  late final GeneratedColumn<String> toAccountId = GeneratedColumn<String>(
+    'to_account_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -983,6 +1055,7 @@ class $TransactionsTable extends Transactions
     id,
     categoryId,
     accountId,
+    toAccountId,
     amount,
     type,
     transactionDate,
@@ -1019,6 +1092,15 @@ class $TransactionsTable extends Transactions
       context.handle(
         _accountIdMeta,
         accountId.isAcceptableOrUnknown(data['account_id']!, _accountIdMeta),
+      );
+    }
+    if (data.containsKey('to_account_id')) {
+      context.handle(
+        _toAccountIdMeta,
+        toAccountId.isAcceptableOrUnknown(
+          data['to_account_id']!,
+          _toAccountIdMeta,
+        ),
       );
     }
     if (data.containsKey('amount')) {
@@ -1089,6 +1171,10 @@ class $TransactionsTable extends Transactions
         DriftSqlType.string,
         data['${effectivePrefix}account_id'],
       ),
+      toAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_account_id'],
+      ),
       amount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}amount'],
@@ -1126,6 +1212,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   final String id;
   final String categoryId;
   final String? accountId;
+  final String? toAccountId;
   final double amount;
   final String type;
   final DateTime transactionDate;
@@ -1136,6 +1223,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     required this.id,
     required this.categoryId,
     this.accountId,
+    this.toAccountId,
     required this.amount,
     required this.type,
     required this.transactionDate,
@@ -1150,6 +1238,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     map['category_id'] = Variable<String>(categoryId);
     if (!nullToAbsent || accountId != null) {
       map['account_id'] = Variable<String>(accountId);
+    }
+    if (!nullToAbsent || toAccountId != null) {
+      map['to_account_id'] = Variable<String>(toAccountId);
     }
     map['amount'] = Variable<double>(amount);
     map['type'] = Variable<String>(type);
@@ -1171,6 +1262,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       accountId: accountId == null && nullToAbsent
           ? const Value.absent()
           : Value(accountId),
+      toAccountId: toAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(toAccountId),
       amount: Value(amount),
       type: Value(type),
       transactionDate: Value(transactionDate),
@@ -1191,6 +1285,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       id: serializer.fromJson<String>(json['id']),
       categoryId: serializer.fromJson<String>(json['categoryId']),
       accountId: serializer.fromJson<String?>(json['accountId']),
+      toAccountId: serializer.fromJson<String?>(json['toAccountId']),
       amount: serializer.fromJson<double>(json['amount']),
       type: serializer.fromJson<String>(json['type']),
       transactionDate: serializer.fromJson<DateTime>(json['transactionDate']),
@@ -1206,6 +1301,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       'id': serializer.toJson<String>(id),
       'categoryId': serializer.toJson<String>(categoryId),
       'accountId': serializer.toJson<String?>(accountId),
+      'toAccountId': serializer.toJson<String?>(toAccountId),
       'amount': serializer.toJson<double>(amount),
       'type': serializer.toJson<String>(type),
       'transactionDate': serializer.toJson<DateTime>(transactionDate),
@@ -1219,6 +1315,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     String? id,
     String? categoryId,
     Value<String?> accountId = const Value.absent(),
+    Value<String?> toAccountId = const Value.absent(),
     double? amount,
     String? type,
     DateTime? transactionDate,
@@ -1229,6 +1326,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     id: id ?? this.id,
     categoryId: categoryId ?? this.categoryId,
     accountId: accountId.present ? accountId.value : this.accountId,
+    toAccountId: toAccountId.present ? toAccountId.value : this.toAccountId,
     amount: amount ?? this.amount,
     type: type ?? this.type,
     transactionDate: transactionDate ?? this.transactionDate,
@@ -1243,6 +1341,9 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ? data.categoryId.value
           : this.categoryId,
       accountId: data.accountId.present ? data.accountId.value : this.accountId,
+      toAccountId: data.toAccountId.present
+          ? data.toAccountId.value
+          : this.toAccountId,
       amount: data.amount.present ? data.amount.value : this.amount,
       type: data.type.present ? data.type.value : this.type,
       transactionDate: data.transactionDate.present
@@ -1260,6 +1361,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           ..write('id: $id, ')
           ..write('categoryId: $categoryId, ')
           ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
           ..write('amount: $amount, ')
           ..write('type: $type, ')
           ..write('transactionDate: $transactionDate, ')
@@ -1275,6 +1377,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     id,
     categoryId,
     accountId,
+    toAccountId,
     amount,
     type,
     transactionDate,
@@ -1289,6 +1392,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
           other.id == this.id &&
           other.categoryId == this.categoryId &&
           other.accountId == this.accountId &&
+          other.toAccountId == this.toAccountId &&
           other.amount == this.amount &&
           other.type == this.type &&
           other.transactionDate == this.transactionDate &&
@@ -1301,6 +1405,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<String> id;
   final Value<String> categoryId;
   final Value<String?> accountId;
+  final Value<String?> toAccountId;
   final Value<double> amount;
   final Value<String> type;
   final Value<DateTime> transactionDate;
@@ -1312,6 +1417,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.id = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.accountId = const Value.absent(),
+    this.toAccountId = const Value.absent(),
     this.amount = const Value.absent(),
     this.type = const Value.absent(),
     this.transactionDate = const Value.absent(),
@@ -1324,6 +1430,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     required String id,
     required String categoryId,
     this.accountId = const Value.absent(),
+    this.toAccountId = const Value.absent(),
     required double amount,
     required String type,
     required DateTime transactionDate,
@@ -1341,6 +1448,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<String>? id,
     Expression<String>? categoryId,
     Expression<String>? accountId,
+    Expression<String>? toAccountId,
     Expression<double>? amount,
     Expression<String>? type,
     Expression<DateTime>? transactionDate,
@@ -1353,6 +1461,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (id != null) 'id': id,
       if (categoryId != null) 'category_id': categoryId,
       if (accountId != null) 'account_id': accountId,
+      if (toAccountId != null) 'to_account_id': toAccountId,
       if (amount != null) 'amount': amount,
       if (type != null) 'type': type,
       if (transactionDate != null) 'transaction_date': transactionDate,
@@ -1367,6 +1476,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Value<String>? id,
     Value<String>? categoryId,
     Value<String?>? accountId,
+    Value<String?>? toAccountId,
     Value<double>? amount,
     Value<String>? type,
     Value<DateTime>? transactionDate,
@@ -1379,6 +1489,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       id: id ?? this.id,
       categoryId: categoryId ?? this.categoryId,
       accountId: accountId ?? this.accountId,
+      toAccountId: toAccountId ?? this.toAccountId,
       amount: amount ?? this.amount,
       type: type ?? this.type,
       transactionDate: transactionDate ?? this.transactionDate,
@@ -1400,6 +1511,9 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     }
     if (accountId.present) {
       map['account_id'] = Variable<String>(accountId.value);
+    }
+    if (toAccountId.present) {
+      map['to_account_id'] = Variable<String>(toAccountId.value);
     }
     if (amount.present) {
       map['amount'] = Variable<double>(amount.value);
@@ -1431,6 +1545,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('id: $id, ')
           ..write('categoryId: $categoryId, ')
           ..write('accountId: $accountId, ')
+          ..write('toAccountId: $toAccountId, ')
           ..write('amount: $amount, ')
           ..write('type: $type, ')
           ..write('transactionDate: $transactionDate, ')
@@ -2033,6 +2148,50 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         requiredDuringInsert: false,
         defaultValue: const Constant(0.0),
       );
+  static const VerificationMeta _expenseCategoryIdMeta = const VerificationMeta(
+    'expenseCategoryId',
+  );
+  @override
+  late final GeneratedColumn<String> expenseCategoryId =
+      GeneratedColumn<String>(
+        'expense_category_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES categories (id) ON DELETE SET NULL',
+        ),
+      );
+  static const VerificationMeta _defaultAccountIdMeta = const VerificationMeta(
+    'defaultAccountId',
+  );
+  @override
+  late final GeneratedColumn<String> defaultAccountId = GeneratedColumn<String>(
+    'default_account_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES accounts (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _autoLogExpenseMeta = const VerificationMeta(
+    'autoLogExpense',
+  );
+  @override
+  late final GeneratedColumn<bool> autoLogExpense = GeneratedColumn<bool>(
+    'auto_log_expense',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("auto_log_expense" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -2074,6 +2233,9 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
     monthlyEmi,
     startDate,
     gstRateOnInterest,
+    expenseCategoryId,
+    defaultAccountId,
+    autoLogExpense,
     status,
     notes,
     createdAt,
@@ -2170,6 +2332,33 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         ),
       );
     }
+    if (data.containsKey('expense_category_id')) {
+      context.handle(
+        _expenseCategoryIdMeta,
+        expenseCategoryId.isAcceptableOrUnknown(
+          data['expense_category_id']!,
+          _expenseCategoryIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_account_id')) {
+      context.handle(
+        _defaultAccountIdMeta,
+        defaultAccountId.isAcceptableOrUnknown(
+          data['default_account_id']!,
+          _defaultAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('auto_log_expense')) {
+      context.handle(
+        _autoLogExpenseMeta,
+        autoLogExpense.isAcceptableOrUnknown(
+          data['auto_log_expense']!,
+          _autoLogExpenseMeta,
+        ),
+      );
+    }
     if (data.containsKey('status')) {
       context.handle(
         _statusMeta,
@@ -2235,6 +2424,18 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         DriftSqlType.double,
         data['${effectivePrefix}gst_rate_on_interest'],
       )!,
+      expenseCategoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}expense_category_id'],
+      ),
+      defaultAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_account_id'],
+      ),
+      autoLogExpense: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}auto_log_expense'],
+      )!,
       status: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}status'],
@@ -2266,6 +2467,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
   final double monthlyEmi;
   final DateTime startDate;
   final double gstRateOnInterest;
+  final String? expenseCategoryId;
+  final String? defaultAccountId;
+  final bool autoLogExpense;
   final String status;
   final String? notes;
   final DateTime createdAt;
@@ -2279,6 +2483,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     required this.monthlyEmi,
     required this.startDate,
     required this.gstRateOnInterest,
+    this.expenseCategoryId,
+    this.defaultAccountId,
+    required this.autoLogExpense,
     required this.status,
     this.notes,
     required this.createdAt,
@@ -2297,6 +2504,13 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     map['monthly_emi'] = Variable<double>(monthlyEmi);
     map['start_date'] = Variable<DateTime>(startDate);
     map['gst_rate_on_interest'] = Variable<double>(gstRateOnInterest);
+    if (!nullToAbsent || expenseCategoryId != null) {
+      map['expense_category_id'] = Variable<String>(expenseCategoryId);
+    }
+    if (!nullToAbsent || defaultAccountId != null) {
+      map['default_account_id'] = Variable<String>(defaultAccountId);
+    }
+    map['auto_log_expense'] = Variable<bool>(autoLogExpense);
     map['status'] = Variable<String>(status);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
@@ -2318,6 +2532,13 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       monthlyEmi: Value(monthlyEmi),
       startDate: Value(startDate),
       gstRateOnInterest: Value(gstRateOnInterest),
+      expenseCategoryId: expenseCategoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expenseCategoryId),
+      defaultAccountId: defaultAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultAccountId),
+      autoLogExpense: Value(autoLogExpense),
       status: Value(status),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
@@ -2343,6 +2564,11 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       monthlyEmi: serializer.fromJson<double>(json['monthlyEmi']),
       startDate: serializer.fromJson<DateTime>(json['startDate']),
       gstRateOnInterest: serializer.fromJson<double>(json['gstRateOnInterest']),
+      expenseCategoryId: serializer.fromJson<String?>(
+        json['expenseCategoryId'],
+      ),
+      defaultAccountId: serializer.fromJson<String?>(json['defaultAccountId']),
+      autoLogExpense: serializer.fromJson<bool>(json['autoLogExpense']),
       status: serializer.fromJson<String>(json['status']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2361,6 +2587,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       'monthlyEmi': serializer.toJson<double>(monthlyEmi),
       'startDate': serializer.toJson<DateTime>(startDate),
       'gstRateOnInterest': serializer.toJson<double>(gstRateOnInterest),
+      'expenseCategoryId': serializer.toJson<String?>(expenseCategoryId),
+      'defaultAccountId': serializer.toJson<String?>(defaultAccountId),
+      'autoLogExpense': serializer.toJson<bool>(autoLogExpense),
       'status': serializer.toJson<String>(status),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2377,6 +2606,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     double? monthlyEmi,
     DateTime? startDate,
     double? gstRateOnInterest,
+    Value<String?> expenseCategoryId = const Value.absent(),
+    Value<String?> defaultAccountId = const Value.absent(),
+    bool? autoLogExpense,
     String? status,
     Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
@@ -2390,6 +2622,13 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     monthlyEmi: monthlyEmi ?? this.monthlyEmi,
     startDate: startDate ?? this.startDate,
     gstRateOnInterest: gstRateOnInterest ?? this.gstRateOnInterest,
+    expenseCategoryId: expenseCategoryId.present
+        ? expenseCategoryId.value
+        : this.expenseCategoryId,
+    defaultAccountId: defaultAccountId.present
+        ? defaultAccountId.value
+        : this.defaultAccountId,
+    autoLogExpense: autoLogExpense ?? this.autoLogExpense,
     status: status ?? this.status,
     notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
@@ -2419,6 +2658,15 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       gstRateOnInterest: data.gstRateOnInterest.present
           ? data.gstRateOnInterest.value
           : this.gstRateOnInterest,
+      expenseCategoryId: data.expenseCategoryId.present
+          ? data.expenseCategoryId.value
+          : this.expenseCategoryId,
+      defaultAccountId: data.defaultAccountId.present
+          ? data.defaultAccountId.value
+          : this.defaultAccountId,
+      autoLogExpense: data.autoLogExpense.present
+          ? data.autoLogExpense.value
+          : this.autoLogExpense,
       status: data.status.present ? data.status.value : this.status,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -2437,6 +2685,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           ..write('monthlyEmi: $monthlyEmi, ')
           ..write('startDate: $startDate, ')
           ..write('gstRateOnInterest: $gstRateOnInterest, ')
+          ..write('expenseCategoryId: $expenseCategoryId, ')
+          ..write('defaultAccountId: $defaultAccountId, ')
+          ..write('autoLogExpense: $autoLogExpense, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt')
@@ -2455,6 +2706,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     monthlyEmi,
     startDate,
     gstRateOnInterest,
+    expenseCategoryId,
+    defaultAccountId,
+    autoLogExpense,
     status,
     notes,
     createdAt,
@@ -2472,6 +2726,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           other.monthlyEmi == this.monthlyEmi &&
           other.startDate == this.startDate &&
           other.gstRateOnInterest == this.gstRateOnInterest &&
+          other.expenseCategoryId == this.expenseCategoryId &&
+          other.defaultAccountId == this.defaultAccountId &&
+          other.autoLogExpense == this.autoLogExpense &&
           other.status == this.status &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt);
@@ -2487,6 +2744,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
   final Value<double> monthlyEmi;
   final Value<DateTime> startDate;
   final Value<double> gstRateOnInterest;
+  final Value<String?> expenseCategoryId;
+  final Value<String?> defaultAccountId;
+  final Value<bool> autoLogExpense;
   final Value<String> status;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
@@ -2501,6 +2761,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     this.monthlyEmi = const Value.absent(),
     this.startDate = const Value.absent(),
     this.gstRateOnInterest = const Value.absent(),
+    this.expenseCategoryId = const Value.absent(),
+    this.defaultAccountId = const Value.absent(),
+    this.autoLogExpense = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2516,6 +2779,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     required double monthlyEmi,
     required DateTime startDate,
     this.gstRateOnInterest = const Value.absent(),
+    this.expenseCategoryId = const Value.absent(),
+    this.defaultAccountId = const Value.absent(),
+    this.autoLogExpense = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
     required DateTime createdAt,
@@ -2538,6 +2804,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Expression<double>? monthlyEmi,
     Expression<DateTime>? startDate,
     Expression<double>? gstRateOnInterest,
+    Expression<String>? expenseCategoryId,
+    Expression<String>? defaultAccountId,
+    Expression<bool>? autoLogExpense,
     Expression<String>? status,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
@@ -2554,6 +2823,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       if (monthlyEmi != null) 'monthly_emi': monthlyEmi,
       if (startDate != null) 'start_date': startDate,
       if (gstRateOnInterest != null) 'gst_rate_on_interest': gstRateOnInterest,
+      if (expenseCategoryId != null) 'expense_category_id': expenseCategoryId,
+      if (defaultAccountId != null) 'default_account_id': defaultAccountId,
+      if (autoLogExpense != null) 'auto_log_expense': autoLogExpense,
       if (status != null) 'status': status,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
@@ -2571,6 +2843,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Value<double>? monthlyEmi,
     Value<DateTime>? startDate,
     Value<double>? gstRateOnInterest,
+    Value<String?>? expenseCategoryId,
+    Value<String?>? defaultAccountId,
+    Value<bool>? autoLogExpense,
     Value<String>? status,
     Value<String?>? notes,
     Value<DateTime>? createdAt,
@@ -2586,6 +2861,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       monthlyEmi: monthlyEmi ?? this.monthlyEmi,
       startDate: startDate ?? this.startDate,
       gstRateOnInterest: gstRateOnInterest ?? this.gstRateOnInterest,
+      expenseCategoryId: expenseCategoryId ?? this.expenseCategoryId,
+      defaultAccountId: defaultAccountId ?? this.defaultAccountId,
+      autoLogExpense: autoLogExpense ?? this.autoLogExpense,
       status: status ?? this.status,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
@@ -2623,6 +2901,15 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     if (gstRateOnInterest.present) {
       map['gst_rate_on_interest'] = Variable<double>(gstRateOnInterest.value);
     }
+    if (expenseCategoryId.present) {
+      map['expense_category_id'] = Variable<String>(expenseCategoryId.value);
+    }
+    if (defaultAccountId.present) {
+      map['default_account_id'] = Variable<String>(defaultAccountId.value);
+    }
+    if (autoLogExpense.present) {
+      map['auto_log_expense'] = Variable<bool>(autoLogExpense.value);
+    }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
@@ -2650,6 +2937,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
           ..write('monthlyEmi: $monthlyEmi, ')
           ..write('startDate: $startDate, ')
           ..write('gstRateOnInterest: $gstRateOnInterest, ')
+          ..write('expenseCategoryId: $expenseCategoryId, ')
+          ..write('defaultAccountId: $defaultAccountId, ')
+          ..write('autoLogExpense: $autoLogExpense, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -5342,10 +5632,31 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'accounts',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('transactions', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'categories',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('budgets', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'categories',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('emi_loans', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'accounts',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('emi_loans', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -5372,7 +5683,7 @@ typedef $$CategoriesTableCreateCompanionBuilder =
       required int iconCode,
       required int colorValue,
       Value<bool> isCustom,
-      required DateTime createdAt,
+      Value<DateTime> createdAt,
       Value<int> rowid,
     });
 typedef $$CategoriesTableUpdateCompanionBuilder =
@@ -5423,6 +5734,24 @@ final class $$CategoriesTableReferences
     ).filter((f) => f.categoryId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_budgetsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$EmiLoansTable, List<EmiLoan>> _emiLoansRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.emiLoans,
+    aliasName: 'categories__id__emi_loans__expense_category_id',
+  );
+
+  $$EmiLoansTableProcessedTableManager get emiLoansRefs {
+    final manager = $$EmiLoansTableTableManager($_db, $_db.emiLoans).filter(
+      (f) => f.expenseCategoryId.id.sqlEquals($_itemColumn<String>('id')!),
+    );
+
+    final cache = $_typedResult.readTableOrNull(_emiLoansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -5514,6 +5843,31 @@ class $$CategoriesTableFilterComposer
           }) => $$BudgetsTableFilterComposer(
             $db: $db,
             $table: $db.budgets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> emiLoansRefs(
+    Expression<bool> Function($$EmiLoansTableFilterComposer f) f,
+  ) {
+    final $$EmiLoansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.emiLoans,
+      getReferencedColumn: (t) => t.expenseCategoryId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EmiLoansTableFilterComposer(
+            $db: $db,
+            $table: $db.emiLoans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5650,6 +6004,31 @@ class $$CategoriesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> emiLoansRefs<T extends Object>(
+    Expression<T> Function($$EmiLoansTableAnnotationComposer a) f,
+  ) {
+    final $$EmiLoansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.emiLoans,
+      getReferencedColumn: (t) => t.expenseCategoryId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EmiLoansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.emiLoans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CategoriesTableTableManager
@@ -5665,7 +6044,11 @@ class $$CategoriesTableTableManager
           $$CategoriesTableUpdateCompanionBuilder,
           (Category, $$CategoriesTableReferences),
           Category,
-          PrefetchHooks Function({bool transactionsRefs, bool budgetsRefs})
+          PrefetchHooks Function({
+            bool transactionsRefs,
+            bool budgetsRefs,
+            bool emiLoansRefs,
+          })
         > {
   $$CategoriesTableTableManager(_$AppDatabase db, $CategoriesTable table)
     : super(
@@ -5706,7 +6089,7 @@ class $$CategoriesTableTableManager
                 required int iconCode,
                 required int colorValue,
                 Value<bool> isCustom = const Value.absent(),
-                required DateTime createdAt,
+                Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion.insert(
                 id: id,
@@ -5727,12 +6110,17 @@ class $$CategoriesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({transactionsRefs = false, budgetsRefs = false}) {
+              ({
+                transactionsRefs = false,
+                budgetsRefs = false,
+                emiLoansRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (transactionsRefs) db.transactions,
                     if (budgetsRefs) db.budgets,
+                    if (emiLoansRefs) db.emiLoans,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5779,6 +6167,27 @@ class $$CategoriesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (emiLoansRefs)
+                        await $_getPrefetchedData<
+                          Category,
+                          $CategoriesTable,
+                          EmiLoan
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CategoriesTableReferences
+                              ._emiLoansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CategoriesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).emiLoansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.expenseCategoryId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5799,7 +6208,11 @@ typedef $$CategoriesTableProcessedTableManager =
       $$CategoriesTableUpdateCompanionBuilder,
       (Category, $$CategoriesTableReferences),
       Category,
-      PrefetchHooks Function({bool transactionsRefs, bool budgetsRefs})
+      PrefetchHooks Function({
+        bool transactionsRefs,
+        bool budgetsRefs,
+        bool emiLoansRefs,
+      })
     >;
 typedef $$AccountsTableCreateCompanionBuilder =
     AccountsCompanion Function({
@@ -5807,6 +6220,7 @@ typedef $$AccountsTableCreateCompanionBuilder =
       required String name,
       required String accountType,
       Value<double> currentBalance,
+      Value<double?> creditLimit,
       required int iconCode,
       required int colorValue,
       Value<int> rowid,
@@ -5817,6 +6231,7 @@ typedef $$AccountsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> accountType,
       Value<double> currentBalance,
+      Value<double?> creditLimit,
       Value<int> iconCode,
       Value<int> colorValue,
       Value<int> rowid,
@@ -5826,19 +6241,19 @@ final class $$AccountsTableReferences
     extends BaseReferences<_$AppDatabase, $AccountsTable, Account> {
   $$AccountsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$TransactionsTable, List<Transaction>>
-  _transactionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.transactions,
-    aliasName: 'accounts__id__transactions__account_id',
+  static MultiTypedResultKey<$EmiLoansTable, List<EmiLoan>> _emiLoansRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.emiLoans,
+    aliasName: 'accounts__id__emi_loans__default_account_id',
   );
 
-  $$TransactionsTableProcessedTableManager get transactionsRefs {
-    final manager = $$TransactionsTableTableManager(
-      $_db,
-      $_db.transactions,
-    ).filter((f) => f.accountId.id.sqlEquals($_itemColumn<String>('id')!));
+  $$EmiLoansTableProcessedTableManager get emiLoansRefs {
+    final manager = $$EmiLoansTableTableManager($_db, $_db.emiLoans).filter(
+      (f) => f.defaultAccountId.id.sqlEquals($_itemColumn<String>('id')!),
+    );
 
-    final cache = $_typedResult.readTableOrNull(_transactionsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_emiLoansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -5874,6 +6289,11 @@ class $$AccountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get iconCode => $composableBuilder(
     column: $table.iconCode,
     builder: (column) => ColumnFilters(column),
@@ -5884,22 +6304,22 @@ class $$AccountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  Expression<bool> transactionsRefs(
-    Expression<bool> Function($$TransactionsTableFilterComposer f) f,
+  Expression<bool> emiLoansRefs(
+    Expression<bool> Function($$EmiLoansTableFilterComposer f) f,
   ) {
-    final $$TransactionsTableFilterComposer composer = $composerBuilder(
+    final $$EmiLoansTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.transactions,
-      getReferencedColumn: (t) => t.accountId,
+      referencedTable: $db.emiLoans,
+      getReferencedColumn: (t) => t.defaultAccountId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$TransactionsTableFilterComposer(
+          }) => $$EmiLoansTableFilterComposer(
             $db: $db,
-            $table: $db.transactions,
+            $table: $db.emiLoans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -5939,6 +6359,11 @@ class $$AccountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get iconCode => $composableBuilder(
     column: $table.iconCode,
     builder: (column) => ColumnOrderings(column),
@@ -5975,6 +6400,11 @@ class $$AccountsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<double> get creditLimit => $composableBuilder(
+    column: $table.creditLimit,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get iconCode =>
       $composableBuilder(column: $table.iconCode, builder: (column) => column);
 
@@ -5983,22 +6413,22 @@ class $$AccountsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  Expression<T> transactionsRefs<T extends Object>(
-    Expression<T> Function($$TransactionsTableAnnotationComposer a) f,
+  Expression<T> emiLoansRefs<T extends Object>(
+    Expression<T> Function($$EmiLoansTableAnnotationComposer a) f,
   ) {
-    final $$TransactionsTableAnnotationComposer composer = $composerBuilder(
+    final $$EmiLoansTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.transactions,
-      getReferencedColumn: (t) => t.accountId,
+      referencedTable: $db.emiLoans,
+      getReferencedColumn: (t) => t.defaultAccountId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$TransactionsTableAnnotationComposer(
+          }) => $$EmiLoansTableAnnotationComposer(
             $db: $db,
-            $table: $db.transactions,
+            $table: $db.emiLoans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6022,7 +6452,7 @@ class $$AccountsTableTableManager
           $$AccountsTableUpdateCompanionBuilder,
           (Account, $$AccountsTableReferences),
           Account,
-          PrefetchHooks Function({bool transactionsRefs})
+          PrefetchHooks Function({bool emiLoansRefs})
         > {
   $$AccountsTableTableManager(_$AppDatabase db, $AccountsTable table)
     : super(
@@ -6041,6 +6471,7 @@ class $$AccountsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> accountType = const Value.absent(),
                 Value<double> currentBalance = const Value.absent(),
+                Value<double?> creditLimit = const Value.absent(),
                 Value<int> iconCode = const Value.absent(),
                 Value<int> colorValue = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -6049,6 +6480,7 @@ class $$AccountsTableTableManager
                 name: name,
                 accountType: accountType,
                 currentBalance: currentBalance,
+                creditLimit: creditLimit,
                 iconCode: iconCode,
                 colorValue: colorValue,
                 rowid: rowid,
@@ -6059,6 +6491,7 @@ class $$AccountsTableTableManager
                 required String name,
                 required String accountType,
                 Value<double> currentBalance = const Value.absent(),
+                Value<double?> creditLimit = const Value.absent(),
                 required int iconCode,
                 required int colorValue,
                 Value<int> rowid = const Value.absent(),
@@ -6067,6 +6500,7 @@ class $$AccountsTableTableManager
                 name: name,
                 accountType: accountType,
                 currentBalance: currentBalance,
+                creditLimit: creditLimit,
                 iconCode: iconCode,
                 colorValue: colorValue,
                 rowid: rowid,
@@ -6079,29 +6513,24 @@ class $$AccountsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({transactionsRefs = false}) {
+          prefetchHooksCallback: ({emiLoansRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (transactionsRefs) db.transactions],
+              explicitlyWatchedTables: [if (emiLoansRefs) db.emiLoans],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
-                  if (transactionsRefs)
-                    await $_getPrefetchedData<
-                      Account,
-                      $AccountsTable,
-                      Transaction
-                    >(
+                  if (emiLoansRefs)
+                    await $_getPrefetchedData<Account, $AccountsTable, EmiLoan>(
                       currentTable: table,
                       referencedTable: $$AccountsTableReferences
-                          ._transactionsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$AccountsTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).transactionsRefs,
+                          ._emiLoansRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$AccountsTableReferences(db, table, p0).emiLoansRefs,
                       referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.accountId == item.id),
+                          referencedItems.where(
+                            (e) => e.defaultAccountId == item.id,
+                          ),
                       typedResults: items,
                     ),
                 ];
@@ -6124,13 +6553,14 @@ typedef $$AccountsTableProcessedTableManager =
       $$AccountsTableUpdateCompanionBuilder,
       (Account, $$AccountsTableReferences),
       Account,
-      PrefetchHooks Function({bool transactionsRefs})
+      PrefetchHooks Function({bool emiLoansRefs})
     >;
 typedef $$TransactionsTableCreateCompanionBuilder =
     TransactionsCompanion Function({
       required String id,
       required String categoryId,
       Value<String?> accountId,
+      Value<String?> toAccountId,
       required double amount,
       required String type,
       required DateTime transactionDate,
@@ -6144,6 +6574,7 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> categoryId,
       Value<String?> accountId,
+      Value<String?> toAccountId,
       Value<double> amount,
       Value<String> type,
       Value<DateTime> transactionDate,
@@ -6185,6 +6616,23 @@ final class $$TransactionsTableReferences
       $_db.accounts,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_accountIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $AccountsTable _toAccountIdTable(_$AppDatabase db) =>
+      db.accounts.createAlias('transactions__to_account_id__accounts__id');
+
+  $$AccountsTableProcessedTableManager? get toAccountId {
+    final $_column = $_itemColumn<String>('to_account_id');
+    if ($_column == null) return null;
+    final manager = $$AccountsTableTableManager(
+      $_db,
+      $_db.accounts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_toAccountIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -6263,6 +6711,29 @@ class $$TransactionsTableFilterComposer
     final $$AccountsTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.accountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableFilterComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$AccountsTableFilterComposer get toAccountId {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.toAccountId,
       referencedTable: $db.accounts,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -6372,6 +6843,29 @@ class $$TransactionsTableOrderingComposer
     );
     return composer;
   }
+
+  $$AccountsTableOrderingComposer get toAccountId {
+    final $$AccountsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.toAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableOrderingComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TransactionsTableAnnotationComposer
@@ -6451,6 +6945,29 @@ class $$TransactionsTableAnnotationComposer
     );
     return composer;
   }
+
+  $$AccountsTableAnnotationComposer get toAccountId {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.toAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TransactionsTableTableManager
@@ -6466,7 +6983,11 @@ class $$TransactionsTableTableManager
           $$TransactionsTableUpdateCompanionBuilder,
           (Transaction, $$TransactionsTableReferences),
           Transaction,
-          PrefetchHooks Function({bool categoryId, bool accountId})
+          PrefetchHooks Function({
+            bool categoryId,
+            bool accountId,
+            bool toAccountId,
+          })
         > {
   $$TransactionsTableTableManager(_$AppDatabase db, $TransactionsTable table)
     : super(
@@ -6484,6 +7005,7 @@ class $$TransactionsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> categoryId = const Value.absent(),
                 Value<String?> accountId = const Value.absent(),
+                Value<String?> toAccountId = const Value.absent(),
                 Value<double> amount = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<DateTime> transactionDate = const Value.absent(),
@@ -6495,6 +7017,7 @@ class $$TransactionsTableTableManager
                 id: id,
                 categoryId: categoryId,
                 accountId: accountId,
+                toAccountId: toAccountId,
                 amount: amount,
                 type: type,
                 transactionDate: transactionDate,
@@ -6508,6 +7031,7 @@ class $$TransactionsTableTableManager
                 required String id,
                 required String categoryId,
                 Value<String?> accountId = const Value.absent(),
+                Value<String?> toAccountId = const Value.absent(),
                 required double amount,
                 required String type,
                 required DateTime transactionDate,
@@ -6519,6 +7043,7 @@ class $$TransactionsTableTableManager
                 id: id,
                 categoryId: categoryId,
                 accountId: accountId,
+                toAccountId: toAccountId,
                 amount: amount,
                 type: type,
                 transactionDate: transactionDate,
@@ -6535,60 +7060,80 @@ class $$TransactionsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({categoryId = false, accountId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (categoryId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.categoryId,
-                                referencedTable: $$TransactionsTableReferences
-                                    ._categoryIdTable(db),
-                                referencedColumn: $$TransactionsTableReferences
-                                    ._categoryIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
-                    if (accountId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.accountId,
-                                referencedTable: $$TransactionsTableReferences
-                                    ._accountIdTable(db),
-                                referencedColumn: $$TransactionsTableReferences
-                                    ._accountIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({categoryId = false, accountId = false, toAccountId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (categoryId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.categoryId,
+                                    referencedTable:
+                                        $$TransactionsTableReferences
+                                            ._categoryIdTable(db),
+                                    referencedColumn:
+                                        $$TransactionsTableReferences
+                                            ._categoryIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (accountId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.accountId,
+                                    referencedTable:
+                                        $$TransactionsTableReferences
+                                            ._accountIdTable(db),
+                                    referencedColumn:
+                                        $$TransactionsTableReferences
+                                            ._accountIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (toAccountId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.toAccountId,
+                                    referencedTable:
+                                        $$TransactionsTableReferences
+                                            ._toAccountIdTable(db),
+                                    referencedColumn:
+                                        $$TransactionsTableReferences
+                                            ._toAccountIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -6605,7 +7150,11 @@ typedef $$TransactionsTableProcessedTableManager =
       $$TransactionsTableUpdateCompanionBuilder,
       (Transaction, $$TransactionsTableReferences),
       Transaction,
-      PrefetchHooks Function({bool categoryId, bool accountId})
+      PrefetchHooks Function({
+        bool categoryId,
+        bool accountId,
+        bool toAccountId,
+      })
     >;
 typedef $$BudgetsTableCreateCompanionBuilder =
     BudgetsCompanion Function({
@@ -6981,6 +7530,9 @@ typedef $$EmiLoansTableCreateCompanionBuilder =
       required double monthlyEmi,
       required DateTime startDate,
       Value<double> gstRateOnInterest,
+      Value<String?> expenseCategoryId,
+      Value<String?> defaultAccountId,
+      Value<bool> autoLogExpense,
       Value<String> status,
       Value<String?> notes,
       required DateTime createdAt,
@@ -6997,6 +7549,9 @@ typedef $$EmiLoansTableUpdateCompanionBuilder =
       Value<double> monthlyEmi,
       Value<DateTime> startDate,
       Value<double> gstRateOnInterest,
+      Value<String?> expenseCategoryId,
+      Value<String?> defaultAccountId,
+      Value<bool> autoLogExpense,
       Value<String> status,
       Value<String?> notes,
       Value<DateTime> createdAt,
@@ -7006,6 +7561,41 @@ typedef $$EmiLoansTableUpdateCompanionBuilder =
 final class $$EmiLoansTableReferences
     extends BaseReferences<_$AppDatabase, $EmiLoansTable, EmiLoan> {
   $$EmiLoansTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CategoriesTable _expenseCategoryIdTable(_$AppDatabase db) => db
+      .categories
+      .createAlias('emi_loans__expense_category_id__categories__id');
+
+  $$CategoriesTableProcessedTableManager? get expenseCategoryId {
+    final $_column = $_itemColumn<String>('expense_category_id');
+    if ($_column == null) return null;
+    final manager = $$CategoriesTableTableManager(
+      $_db,
+      $_db.categories,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_expenseCategoryIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $AccountsTable _defaultAccountIdTable(_$AppDatabase db) =>
+      db.accounts.createAlias('emi_loans__default_account_id__accounts__id');
+
+  $$AccountsTableProcessedTableManager? get defaultAccountId {
+    final $_column = $_itemColumn<String>('default_account_id');
+    if ($_column == null) return null;
+    final manager = $$AccountsTableTableManager(
+      $_db,
+      $_db.accounts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_defaultAccountIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$EmiPaymentsTable, List<EmiPayment>>
   _emiPaymentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -7080,6 +7670,11 @@ class $$EmiLoansTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get autoLogExpense => $composableBuilder(
+    column: $table.autoLogExpense,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnFilters(column),
@@ -7094,6 +7689,52 @@ class $$EmiLoansTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$CategoriesTableFilterComposer get expenseCategoryId {
+    final $$CategoriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.expenseCategoryId,
+      referencedTable: $db.categories,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CategoriesTableFilterComposer(
+            $db: $db,
+            $table: $db.categories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$AccountsTableFilterComposer get defaultAccountId {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableFilterComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> emiPaymentsRefs(
     Expression<bool> Function($$EmiPaymentsTableFilterComposer f) f,
@@ -7175,6 +7816,11 @@ class $$EmiLoansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get autoLogExpense => $composableBuilder(
+    column: $table.autoLogExpense,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -7189,6 +7835,52 @@ class $$EmiLoansTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$CategoriesTableOrderingComposer get expenseCategoryId {
+    final $$CategoriesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.expenseCategoryId,
+      referencedTable: $db.categories,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CategoriesTableOrderingComposer(
+            $db: $db,
+            $table: $db.categories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$AccountsTableOrderingComposer get defaultAccountId {
+    final $$AccountsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableOrderingComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$EmiLoansTableAnnotationComposer
@@ -7241,6 +7933,11 @@ class $$EmiLoansTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get autoLogExpense => $composableBuilder(
+    column: $table.autoLogExpense,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
@@ -7249,6 +7946,52 @@ class $$EmiLoansTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CategoriesTableAnnotationComposer get expenseCategoryId {
+    final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.expenseCategoryId,
+      referencedTable: $db.categories,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CategoriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.categories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$AccountsTableAnnotationComposer get defaultAccountId {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> emiPaymentsRefs<T extends Object>(
     Expression<T> Function($$EmiPaymentsTableAnnotationComposer a) f,
@@ -7289,7 +8032,11 @@ class $$EmiLoansTableTableManager
           $$EmiLoansTableUpdateCompanionBuilder,
           (EmiLoan, $$EmiLoansTableReferences),
           EmiLoan,
-          PrefetchHooks Function({bool emiPaymentsRefs})
+          PrefetchHooks Function({
+            bool expenseCategoryId,
+            bool defaultAccountId,
+            bool emiPaymentsRefs,
+          })
         > {
   $$EmiLoansTableTableManager(_$AppDatabase db, $EmiLoansTable table)
     : super(
@@ -7313,6 +8060,9 @@ class $$EmiLoansTableTableManager
                 Value<double> monthlyEmi = const Value.absent(),
                 Value<DateTime> startDate = const Value.absent(),
                 Value<double> gstRateOnInterest = const Value.absent(),
+                Value<String?> expenseCategoryId = const Value.absent(),
+                Value<String?> defaultAccountId = const Value.absent(),
+                Value<bool> autoLogExpense = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -7327,6 +8077,9 @@ class $$EmiLoansTableTableManager
                 monthlyEmi: monthlyEmi,
                 startDate: startDate,
                 gstRateOnInterest: gstRateOnInterest,
+                expenseCategoryId: expenseCategoryId,
+                defaultAccountId: defaultAccountId,
+                autoLogExpense: autoLogExpense,
                 status: status,
                 notes: notes,
                 createdAt: createdAt,
@@ -7343,6 +8096,9 @@ class $$EmiLoansTableTableManager
                 required double monthlyEmi,
                 required DateTime startDate,
                 Value<double> gstRateOnInterest = const Value.absent(),
+                Value<String?> expenseCategoryId = const Value.absent(),
+                Value<String?> defaultAccountId = const Value.absent(),
+                Value<bool> autoLogExpense = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 required DateTime createdAt,
@@ -7357,6 +8113,9 @@ class $$EmiLoansTableTableManager
                 monthlyEmi: monthlyEmi,
                 startDate: startDate,
                 gstRateOnInterest: gstRateOnInterest,
+                expenseCategoryId: expenseCategoryId,
+                defaultAccountId: defaultAccountId,
+                autoLogExpense: autoLogExpense,
                 status: status,
                 notes: notes,
                 createdAt: createdAt,
@@ -7370,35 +8129,89 @@ class $$EmiLoansTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({emiPaymentsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (emiPaymentsRefs) db.emiPayments],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (emiPaymentsRefs)
-                    await $_getPrefetchedData<
-                      EmiLoan,
-                      $EmiLoansTable,
-                      EmiPayment
-                    >(
-                      currentTable: table,
-                      referencedTable: $$EmiLoansTableReferences
-                          ._emiPaymentsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$EmiLoansTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).emiPaymentsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.loanId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                expenseCategoryId = false,
+                defaultAccountId = false,
+                emiPaymentsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (emiPaymentsRefs) db.emiPayments,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (expenseCategoryId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.expenseCategoryId,
+                                    referencedTable: $$EmiLoansTableReferences
+                                        ._expenseCategoryIdTable(db),
+                                    referencedColumn: $$EmiLoansTableReferences
+                                        ._expenseCategoryIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (defaultAccountId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.defaultAccountId,
+                                    referencedTable: $$EmiLoansTableReferences
+                                        ._defaultAccountIdTable(db),
+                                    referencedColumn: $$EmiLoansTableReferences
+                                        ._defaultAccountIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (emiPaymentsRefs)
+                        await $_getPrefetchedData<
+                          EmiLoan,
+                          $EmiLoansTable,
+                          EmiPayment
+                        >(
+                          currentTable: table,
+                          referencedTable: $$EmiLoansTableReferences
+                              ._emiPaymentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$EmiLoansTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).emiPaymentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.loanId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -7415,7 +8228,11 @@ typedef $$EmiLoansTableProcessedTableManager =
       $$EmiLoansTableUpdateCompanionBuilder,
       (EmiLoan, $$EmiLoansTableReferences),
       EmiLoan,
-      PrefetchHooks Function({bool emiPaymentsRefs})
+      PrefetchHooks Function({
+        bool expenseCategoryId,
+        bool defaultAccountId,
+        bool emiPaymentsRefs,
+      })
     >;
 typedef $$EmiPaymentsTableCreateCompanionBuilder =
     EmiPaymentsCompanion Function({

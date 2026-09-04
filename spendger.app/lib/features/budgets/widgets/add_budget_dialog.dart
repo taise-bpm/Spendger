@@ -96,6 +96,7 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
     }
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Edit Category Budget' : 'Set Category Budget', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(

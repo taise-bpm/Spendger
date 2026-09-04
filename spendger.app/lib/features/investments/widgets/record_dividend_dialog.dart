@@ -88,6 +88,7 @@ class _RecordDividendDialogState extends ConsumerState<RecordDividendDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text('Month ${widget.installment.installmentNumber} Payment', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(

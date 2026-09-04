@@ -26,6 +26,9 @@ class AppColors {
   static const chitty = Color(0xFFEC4899); // Pink
   static const gold = Color(0xFFEAB308); // Gold Yellow
   static const sip = Color(0xFF06B6D4); // Cyan
+  static const fd = Color(0xFF3B82F6); // Blue
+  static const rd = Color(0xFF10B981); // Emerald / Teal
+  static const ppf = Color(0xFF6366F1); // Indigo / Violet
 
   // Budget Alert Zones
   static const budgetSafe = Color(0xFF10B981); // < 75%

@@ -207,7 +207,7 @@ class BackupService {
               iconCode: item['iconCode'],
               colorValue: item['colorValue'],
               isCustom: Value(item['isCustom'] ?? false),
-              createdAt: DateTime.parse(item['createdAt']),
+              createdAt: Value(DateTime.parse(item['createdAt'])),
             ),
           );
         }

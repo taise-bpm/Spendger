@@ -7,7 +7,7 @@ class Categories extends Table {
   IntColumn get iconCode => integer()();
   IntColumn get colorValue => integer()();
   BoolColumn get isCustom => boolean().withDefault(const Constant(false))();
-  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -18,6 +18,7 @@ class Accounts extends Table {
   TextColumn get name => text()(); // 'Cash', 'Bank Account', 'Credit Card', 'UPI'
   TextColumn get accountType => text()();
   RealColumn get currentBalance => real().withDefault(const Constant(0.0))();
+  RealColumn get creditLimit => real().nullable()(); // Credit card spending limit
   IntColumn get iconCode => integer()();
   IntColumn get colorValue => integer()();
 
@@ -29,6 +30,7 @@ class Transactions extends Table {
   TextColumn get id => text()();
   TextColumn get categoryId => text().references(Categories, #id, onDelete: KeyAction.restrict)();
   TextColumn get accountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
+  TextColumn get toAccountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
   RealColumn get amount => real()();
   TextColumn get type => text()(); // 'income', 'expense', 'transfer'
   DateTimeColumn get transactionDate => dateTime()();
@@ -63,6 +65,9 @@ class EmiLoans extends Table {
   RealColumn get monthlyEmi => real()();
   DateTimeColumn get startDate => dateTime()();
   RealColumn get gstRateOnInterest => real().withDefault(const Constant(0.0))();
+  TextColumn get expenseCategoryId => text().nullable().references(Categories, #id, onDelete: KeyAction.setNull)();
+  TextColumn get defaultAccountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
+  BoolColumn get autoLogExpense => boolean().withDefault(const Constant(true))();
   TextColumn get status => text().withDefault(const Constant('active'))(); // 'active', 'closed', 'foreclosed'
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();

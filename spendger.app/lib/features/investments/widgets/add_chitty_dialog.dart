@@ -9,7 +9,9 @@ import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
 
 class AddChittyDialog extends ConsumerStatefulWidget {
-  const AddChittyDialog({super.key});
+  final Investment? investmentToEdit;
+
+  const AddChittyDialog({super.key, this.investmentToEdit});
 
   @override
   ConsumerState<AddChittyDialog> createState() => _AddChittyDialogState();
@@ -20,6 +22,22 @@ class _AddChittyDialogState extends ConsumerState<AddChittyDialog> {
   final _totalChitAmountController = TextEditingController();
   final _totalMonthsController = TextEditingController(text: '40');
   final _grossInstallmentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.investmentToEdit != null) {
+      final inv = widget.investmentToEdit!;
+      _nameController.text = inv.name;
+      _totalChitAmountController.text = (inv.totalCommittedAmount ?? 0.0).toStringAsFixed(0);
+      if (inv.maturityDate != null) {
+        final days = inv.maturityDate!.difference(inv.startDate).inDays;
+        final months = (days / 30).round();
+        if (months > 0) _totalMonthsController.text = months.toString();
+      }
+      _onAmountChanged();
+    }
+  }
 
   @override
   void dispose() {
@@ -52,46 +70,59 @@ class _AddChittyDialogState extends ConsumerState<AddChittyDialog> {
     }
 
     final db = ref.read(databaseProvider);
-    const uuid = Uuid();
-    final investmentId = uuid.v4();
-    final now = DateTime.now();
 
-    // 1. Create Investment record
-    await db.into(db.investments).insert(
-      InvestmentsCompanion.insert(
-        id: investmentId,
-        name: name,
-        type: 'chitty',
-        startDate: now,
-        maturityDate: drift.Value(DateTime(now.year, now.month + months, now.day)),
-        totalCommittedAmount: drift.Value(totalAmount),
-        currentValuation: 0.0,
-        createdAt: now,
-      ),
-    );
-
-    // 2. Pre-populate all installment months for the Chitty
-    for (int i = 1; i <= months; i++) {
-      final dueDate = DateTime(now.year, now.month + (i - 1), 10);
-      await db.into(db.chittyInstallments).insert(
-        ChittyInstallmentsCompanion.insert(
-          id: uuid.v4(),
-          investmentId: investmentId,
-          installmentNumber: i,
-          dueDate: dueDate,
-          grossInstallment: gross,
-          dividendEarned: const drift.Value(0.0),
-          netAmountPaid: gross,
-          isPaid: const drift.Value(false),
+    if (widget.investmentToEdit != null) {
+      final inv = widget.investmentToEdit!;
+      await db.updateInvestment(
+        inv.id,
+        InvestmentsCompanion(
+          name: drift.Value(name),
+          totalCommittedAmount: drift.Value(totalAmount),
+          maturityDate: drift.Value(DateTime(inv.startDate.year, inv.startDate.month + months, inv.startDate.day)),
         ),
       );
+    } else {
+      const uuid = Uuid();
+      final investmentId = uuid.v4();
+      final now = DateTime.now();
+
+      // 1. Create Investment record
+      await db.into(db.investments).insert(
+        InvestmentsCompanion.insert(
+          id: investmentId,
+          name: name,
+          type: 'chitty',
+          startDate: now,
+          maturityDate: drift.Value(DateTime(now.year, now.month + months, now.day)),
+          totalCommittedAmount: drift.Value(totalAmount),
+          currentValuation: 0.0,
+          createdAt: now,
+        ),
+      );
+
+      // 2. Pre-populate all installment months for the Chitty
+      for (int i = 1; i <= months; i++) {
+        final dueDate = DateTime(now.year, now.month + (i - 1), 10);
+        await db.into(db.chittyInstallments).insert(
+          ChittyInstallmentsCompanion.insert(
+            id: uuid.v4(),
+            investmentId: investmentId,
+            installmentNumber: i,
+            dueDate: dueDate,
+            grossInstallment: gross,
+            dividendEarned: const drift.Value(0.0),
+            netAmountPaid: gross,
+            isPaid: const drift.Value(false),
+          ),
+        );
+      }
     }
 
     if (mounted) {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Chit Fund (Chitty) scheme added!'),
+        SnackBar(
+          content: Text(widget.investmentToEdit != null ? 'Chit Fund scheme updated!' : 'Chit Fund (Chitty) scheme added!'),
           backgroundColor: AppColors.chitty,
         ),
       );
@@ -100,8 +131,11 @@ class _AddChittyDialogState extends ConsumerState<AddChittyDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.investmentToEdit != null;
+
     return AlertDialog(
-      title: const Text('Add Chit Fund (Chitty)', style: TextStyle(fontWeight: FontWeight.bold)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(isEditing ? 'Edit Chit Fund (Chitty)' : 'Add Chit Fund (Chitty)', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -165,7 +199,7 @@ class _AddChittyDialogState extends ConsumerState<AddChittyDialog> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.chitty, foregroundColor: Colors.white),
           onPressed: _saveChitty,
-          child: const Text('Create Scheme'),
+          child: Text(isEditing ? 'Update Scheme' : 'Create Scheme'),
         ),
       ],
     );

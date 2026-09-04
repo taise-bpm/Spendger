@@ -191,7 +191,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
                     itemCount: budgets.length,
                     itemBuilder: (context, index) {
                       final b = budgets[index];

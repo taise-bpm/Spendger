@@ -97,7 +97,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> w
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
           itemCount: categories.length,
           separatorBuilder: (_, __) => const Gap(8),
           itemBuilder: (context, index) {
@@ -248,34 +248,45 @@ class _AddOrEditCategoryDialogState extends ConsumerState<_AddOrEditCategoryDial
       return;
     }
 
-    final db = ref.read(databaseProvider);
-    const uuid = Uuid();
+    try {
+      final db = ref.read(databaseProvider);
+      const uuid = Uuid();
+      final now = DateTime.now();
 
-    final catCompanion = CategoriesCompanion(
-      id: drift.Value(_isEditing ? widget.categoryToEdit!.id : uuid.v4()),
-      name: drift.Value(name),
-      type: drift.Value(_isEditing ? widget.categoryToEdit!.type : widget.type),
-      iconCode: drift.Value(_selectedIconCode),
-      colorValue: drift.Value(_selectedColorValue),
-      isCustom: drift.Value(_isEditing ? widget.categoryToEdit!.isCustom : true),
-    );
-
-    await db.upsertCategory(catCompanion);
-
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEditing ? 'Category "$name" updated!' : 'Category "$name" created!'),
-          backgroundColor: AppColors.income,
-        ),
+      final catCompanion = CategoriesCompanion(
+        id: drift.Value(_isEditing ? widget.categoryToEdit!.id : uuid.v4()),
+        name: drift.Value(name),
+        type: drift.Value(_isEditing ? widget.categoryToEdit!.type : widget.type),
+        iconCode: drift.Value(_selectedIconCode),
+        colorValue: drift.Value(_selectedColorValue),
+        isCustom: drift.Value(_isEditing ? widget.categoryToEdit!.isCustom : true),
+        createdAt: drift.Value(_isEditing ? widget.categoryToEdit!.createdAt : now),
       );
+
+      await db.upsertCategory(catCompanion);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isEditing ? 'Category "$name" updated!' : 'Category "$name" created!'),
+            backgroundColor: AppColors.income,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save category: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Edit Category' : 'Add ${widget.type == 'income' ? 'Income' : 'Expense'} Category', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(

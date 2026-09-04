@@ -64,6 +64,11 @@ final chittyInstallmentsStreamProvider = StreamProvider.autoDispose.family<List<
   return db.watchChittyInstallments(investmentId);
 });
 
+final investmentTransactionsStreamProvider = StreamProvider.autoDispose.family<List<Transaction>, String?>((ref, investmentId) {
+  final db = ref.watch(databaseProvider);
+  return db.watchInvestmentTransactions(investmentId: investmentId);
+});
+
 // Reminders Stream
 final remindersStreamProvider = StreamProvider.autoDispose<List<Reminder>>((ref) {
   final db = ref.watch(databaseProvider);

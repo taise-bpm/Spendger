@@ -31,10 +31,6 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
   late TextEditingController _gstController;
   late DateTime _paymentDate;
 
-  String? _selectedCategoryId;
-  String? _selectedAccountId;
-  bool _logToExpenseLedger = true;
-
   bool get _isAlreadyPaid => widget.existingPayment != null;
 
   @override
@@ -66,24 +62,6 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
     );
 
     _paymentDate = p?.paymentDate ?? DateTime.now();
-
-    if (_isAlreadyPaid) {
-      _loadLinkedTransaction();
-    }
-  }
-
-  Future<void> _loadLinkedTransaction() async {
-    final db = ref.read(databaseProvider);
-    final tx = await db.getTransactionForEmiPayment(widget.loan.id, widget.scheduledItem.monthNumber);
-    if (mounted) {
-      setState(() {
-        if (tx != null) {
-          _selectedCategoryId = tx.categoryId;
-          _selectedAccountId = tx.accountId;
-          _logToExpenseLedger = true;
-        }
-      });
-    }
   }
 
   @override
@@ -102,7 +80,7 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
     return principal > 0 ? principal : 0.0;
   }
 
-  Future<void> _submitPayment() async {
+  Future<void> _submitPayment(String? defaultCatId, String? defaultAccId) async {
     final total = double.tryParse(_totalEmiController.text.trim());
     final interest = double.tryParse(_interestController.text.trim());
     final gst = double.tryParse(_gstController.text.trim()) ?? 0.0;
@@ -122,6 +100,13 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
       return;
     }
 
+    final catIdToUse = widget.loan.autoLogExpense
+        ? (widget.loan.expenseCategoryId ?? defaultCatId)
+        : null;
+    final accIdToUse = widget.loan.autoLogExpense
+        ? (widget.loan.defaultAccountId ?? defaultAccId)
+        : null;
+
     final db = ref.read(databaseProvider);
     await db.recordOrUpdateEmiPayment(
       loanId: widget.loan.id,
@@ -131,8 +116,8 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
       interestPaid: interest,
       gstPaid: gst,
       totalAmountPaid: total,
-      categoryId: _logToExpenseLedger ? _selectedCategoryId : null,
-      accountId: _logToExpenseLedger ? _selectedAccountId : null,
+      categoryId: catIdToUse,
+      accountId: accIdToUse,
     );
 
     if (mounted) {
@@ -141,8 +126,10 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
         SnackBar(
           content: Text(
             _isAlreadyPaid
-                ? 'Month #${widget.scheduledItem.monthNumber} payment & expense updated!'
-                : 'Month #${widget.scheduledItem.monthNumber} payment recorded in Expense Ledger!',
+                ? 'Month #${widget.scheduledItem.monthNumber} payment updated!'
+                : (widget.loan.autoLogExpense
+                    ? 'Month #${widget.scheduledItem.monthNumber} payment recorded in Expense Ledger!'
+                    : 'Month #${widget.scheduledItem.monthNumber} payment recorded!'),
           ),
           backgroundColor: AppColors.income,
         ),
@@ -154,8 +141,9 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         title: const Text('Unmark Payment?'),
-        content: Text('Remove payment record and corresponding expense ledger entry for Month #${widget.scheduledItem.monthNumber}?'),
+        content: Text('Remove payment record and corresponding expense entry for Month #${widget.scheduledItem.monthNumber}?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           ElevatedButton(
@@ -191,20 +179,33 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
     final expenseCategories = categoriesAsync.value ?? [];
     final accounts = accountsAsync.value ?? [];
 
-    if (_selectedCategoryId == null && expenseCategories.isNotEmpty) {
-      // Find a category related to EMI/Loans or default to first
-      final emiCat = expenseCategories.firstWhere(
-        (c) => c.name.toLowerCase().contains('loan') || c.name.toLowerCase().contains('emi'),
-        orElse: () => expenseCategories.first,
-      );
-      _selectedCategoryId = emiCat.id;
+    Category? configuredCat;
+    if (widget.loan.expenseCategoryId != null) {
+      for (final c in expenseCategories) {
+        if (c.id == widget.loan.expenseCategoryId) {
+          configuredCat = c;
+          break;
+        }
+      }
     }
+    configuredCat ??= expenseCategories.firstWhere(
+      (c) => c.name.toLowerCase().contains('loan') || c.name.toLowerCase().contains('emi'),
+      orElse: () => expenseCategories.isNotEmpty ? expenseCategories.first : Category(id: '', name: 'General Expense', type: 'expense', iconCode: 0, colorValue: 0xFF10B981, isCustom: false, createdAt: DateTime.now()),
+    );
 
-    if (_selectedAccountId == null && accounts.isNotEmpty) {
-      _selectedAccountId = accounts.first.id;
+    Account? configuredAccount;
+    if (widget.loan.defaultAccountId != null) {
+      for (final a in accounts) {
+        if (a.id == widget.loan.defaultAccountId) {
+          configuredAccount = a;
+          break;
+        }
+      }
     }
+    configuredAccount ??= accounts.isNotEmpty ? accounts.first : null;
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Row(
         children: [
           CircleAvatar(
@@ -307,100 +308,58 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
             ),
             const Gap(14),
 
-            // Expense Ledger Integration Card
+            // Clean Information Note on Expense Ledger Posting
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
+                color: widget.loan.autoLogExpense
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: widget.loan.autoLogExpense
+                      ? AppColors.primary.withValues(alpha: 0.25)
+                      : Colors.grey.withValues(alpha: 0.2),
+                ),
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.primaryLight),
-                          Gap(6),
-                          Text('Log in Expense Ledger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                      Switch(
-                        value: _logToExpenseLedger,
-                        activeThumbColor: AppColors.primaryLight,
-                        onChanged: (val) => setState(() => _logToExpenseLedger = val),
-                      ),
-                    ],
+                  Icon(
+                    widget.loan.autoLogExpense ? Icons.receipt_long_outlined : Icons.info_outline,
+                    size: 18,
+                    color: widget.loan.autoLogExpense ? AppColors.primaryLight : Colors.grey,
                   ),
-                  if (_logToExpenseLedger) ...[
-                    const Gap(8),
-                    // Expense Header Tag Dropdown
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Expense Header / Category',
-                        prefixIcon: Icon(Icons.category_outlined, size: 18),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedCategoryId,
-                          isExpanded: true,
-                          items: expenseCategories.map((c) {
-                            return DropdownMenuItem(
-                              value: c.id,
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 8,
-                                    backgroundColor: Color(c.colorValue),
-                                  ),
-                                  const Gap(8),
-                                  Expanded(
-                                    child: Text(c.name, overflow: TextOverflow.ellipsis),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) => setState(() => _selectedCategoryId = val),
+                  const Gap(10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.loan.autoLogExpense
+                              ? 'Posts to Expense Ledger'
+                              : 'Expense Ledger Sync Disabled',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: widget.loan.autoLogExpense ? AppColors.primaryLight : Colors.grey,
+                          ),
                         ),
-                      ),
-                    ),
-                    const Gap(10),
-                    // Paid from Account
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Deduct From Account',
-                        prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: 18),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedAccountId,
-                          isExpanded: true,
-                          items: accounts.map((a) {
-                            return DropdownMenuItem(
-                              value: a.id,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(a.name, overflow: TextOverflow.ellipsis),
-                                  Text(
-                                    CurrencyFormatter.format(a.currentBalance),
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) => setState(() => _selectedAccountId = val),
+                        const Gap(2),
+                        Text(
+                          widget.loan.autoLogExpense
+                              ? 'Tagged under "${configuredCat.name}"${configuredAccount != null ? ' from "${configuredAccount.name}"' : ''}.'
+                              : 'This payment will only update loan amortization without creating an expense entry.',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
-                      ),
+                        const Gap(2),
+                        const Text(
+                          'Change default header & account in EMI Settings (⋮).',
+                          style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
@@ -466,7 +425,7 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.loan, foregroundColor: Colors.white),
-          onPressed: _submitPayment,
+          onPressed: () => _submitPayment(configuredCat?.id, configuredAccount?.id),
           child: Text(_isAlreadyPaid ? 'Update Payment' : 'Save Payment'),
         ),
       ],

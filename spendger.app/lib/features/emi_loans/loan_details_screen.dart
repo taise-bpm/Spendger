@@ -54,20 +54,15 @@ class LoanDetailsScreen extends ConsumerWidget {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit Loan Details',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AddLoanDialog(loanToEdit: currentLoan),
-              );
-            },
-          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             onSelected: (val) async {
-              if (val == 'delete') {
+              if (val == 'edit_settings') {
+                showDialog(
+                  context: context,
+                  builder: (_) => AddLoanDialog(loanToEdit: currentLoan),
+                );
+              } else if (val == 'delete') {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -95,6 +90,16 @@ class LoanDetailsScreen extends ConsumerWidget {
               }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'edit_settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    Gap(8),
+                    Text('Edit Loan & Settings'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'delete',
                 child: Row(
@@ -137,7 +142,7 @@ class LoanDetailsScreen extends ConsumerWidget {
                         children: [
                           const Text('Monthly EMI', style: TextStyle(fontSize: 12, color: Colors.grey)),
                           Text(
-                            CurrencyFormatter.format(loan.monthlyEmi),
+                            CurrencyFormatter.format(currentLoan.monthlyEmi),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -159,7 +164,7 @@ class LoanDetailsScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Paid: ${payments.length} / ${loan.tenureMonths} Months',
+                        'Paid: ${payments.length} / ${currentLoan.tenureMonths} Months',
                         style: const TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                       Text(

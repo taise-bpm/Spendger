@@ -29,6 +29,10 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
   final _gstController = TextEditingController(text: '0.0');
   DateTime _startDate = DateTime.now();
 
+  String? _selectedExpenseCategoryId;
+  String? _selectedDefaultAccountId;
+  bool _autoLogExpense = true;
+
   double _calculatedEmi = 0.0;
   bool get _isEditing => widget.loanToEdit != null;
 
@@ -47,6 +51,9 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
       _gstController.text = loan.gstRateOnInterest.toString();
       _startDate = loan.startDate;
       _calculatedEmi = loan.monthlyEmi;
+      _selectedExpenseCategoryId = loan.expenseCategoryId;
+      _selectedDefaultAccountId = loan.defaultAccountId;
+      _autoLogExpense = loan.autoLogExpense;
     }
   }
 
@@ -107,6 +114,9 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
         monthlyEmi: drift.Value(emi),
         startDate: drift.Value(_startDate),
         gstRateOnInterest: drift.Value(gstRate),
+        expenseCategoryId: drift.Value(_selectedExpenseCategoryId),
+        defaultAccountId: drift.Value(_selectedDefaultAccountId),
+        autoLogExpense: drift.Value(_autoLogExpense),
         status: drift.Value(widget.loanToEdit!.status),
         createdAt: drift.Value(widget.loanToEdit!.createdAt),
       );
@@ -117,7 +127,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('EMI Loan updated successfully!'),
+            content: Text('EMI Loan & Ledger settings updated!'),
             backgroundColor: AppColors.income,
           ),
         );
@@ -138,6 +148,9 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
           monthlyEmi: emi,
           startDate: _startDate,
           gstRateOnInterest: drift.Value(gstRate),
+          expenseCategoryId: drift.Value(_selectedExpenseCategoryId),
+          defaultAccountId: drift.Value(_selectedDefaultAccountId),
+          autoLogExpense: drift.Value(_autoLogExpense),
           status: const drift.Value('active'),
           createdAt: now,
         ),
@@ -147,7 +160,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
         Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('EMI Loan created successfully!'),
+            content: Text('EMI Loan created with Ledger settings!'),
             backgroundColor: AppColors.loan,
           ),
         );
@@ -157,8 +170,27 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final categoriesAsync = ref.watch(categoriesStreamProvider('expense'));
+    final accountsAsync = ref.watch(accountsStreamProvider);
+
+    final expenseCategories = categoriesAsync.value ?? [];
+    final accounts = accountsAsync.value ?? [];
+
+    if (_selectedExpenseCategoryId == null && expenseCategories.isNotEmpty) {
+      final emiCat = expenseCategories.firstWhere(
+        (c) => c.name.toLowerCase().contains('loan') || c.name.toLowerCase().contains('emi'),
+        orElse: () => expenseCategories.first,
+      );
+      _selectedExpenseCategoryId = emiCat.id;
+    }
+
+    if (_selectedDefaultAccountId == null && accounts.isNotEmpty) {
+      _selectedDefaultAccountId = accounts.first.id;
+    }
+
     return AlertDialog(
-      title: Text(_isEditing ? 'Edit EMI Loan' : 'Add New EMI Loan', style: const TextStyle(fontWeight: FontWeight.bold)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(_isEditing ? 'Edit EMI Loan & Settings' : 'Add New EMI Loan', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -258,7 +290,118 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
                 helperText: 'Standard in India is 18.0% if applicable',
               ),
             ),
-            const Gap(16),
+            const Gap(14),
+
+            // Expense Ledger Default Settings Section
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome, size: 16, color: AppColors.primaryLight),
+                          Gap(6),
+                          Text('Expense Ledger Automation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ],
+                      ),
+                      Switch(
+                        value: _autoLogExpense,
+                        activeThumbColor: AppColors.primaryLight,
+                        onChanged: (val) => setState(() => _autoLogExpense = val),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Automatically pre-tags this category & account on future EMI payments',
+                    style: TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                  if (_autoLogExpense) ...[
+                    const Gap(8),
+                    // Default Expense Category
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Default Expense Header / Category',
+                        prefixIcon: Icon(Icons.category_outlined, size: 18),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedExpenseCategoryId,
+                          isExpanded: true,
+                          items: expenseCategories.map((c) {
+                            return DropdownMenuItem(
+                              value: c.id,
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 8,
+                                    backgroundColor: Color(c.colorValue),
+                                  ),
+                                  const Gap(8),
+                                  Expanded(
+                                    child: Text(c.name, overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedExpenseCategoryId = val),
+                        ),
+                      ),
+                    ),
+                    const Gap(10),
+                    // Default Payment Account
+                    InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Default Payment Account',
+                        prefixIcon: Icon(Icons.account_balance_wallet_outlined, size: 18),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedDefaultAccountId,
+                          isExpanded: true,
+                          items: accounts.map((a) {
+                            return DropdownMenuItem(
+                              value: a.id,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      a.name,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                  const Gap(8),
+                                  Text(
+                                    CurrencyFormatter.format(a.currentBalance),
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) => setState(() => _selectedDefaultAccountId = val),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Gap(14),
+
             // Live Calculated EMI preview
             Container(
               padding: const EdgeInsets.all(12),
@@ -289,7 +432,7 @@ class _AddLoanDialogState extends ConsumerState<AddLoanDialog> {
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.loan, foregroundColor: Colors.white),
           onPressed: _saveLoan,
-          child: Text(_isEditing ? 'Update Loan Details' : 'Create EMI Schedule'),
+          child: Text(_isEditing ? 'Save Changes' : 'Create EMI Schedule'),
         ),
       ],
     );
