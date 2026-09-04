@@ -122,6 +122,8 @@ class DashboardScreen extends ConsumerWidget {
                       transaction: tx,
                       category: catMap[tx.categoryId],
                       account: accMap[tx.accountId],
+                      toAccount: accMap[tx.toAccountId],
+                      isDismissible: false,
                     ),
                   ),
             const Gap(30),

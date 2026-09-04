@@ -8,6 +8,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../reports/financial_report_screen.dart';
 
 class CashFlowChart extends ConsumerStatefulWidget {
   const CashFlowChart({super.key});
@@ -160,44 +161,98 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
               const Gap(14),
 
               // Four Flow Indicators: Budget, Income, Expense, Invested
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildFlowIndicator(
-                      label: 'Budget',
-                      amount: totalBudget,
-                      color: AppColors.transfer,
-                      icon: Icons.track_changes,
-                    ),
-                  ),
-                  const Gap(6),
-                  Expanded(
-                    child: _buildFlowIndicator(
-                      label: 'Income',
-                      amount: totalIncome,
-                      color: AppColors.income,
-                      icon: Icons.arrow_downward,
-                    ),
-                  ),
-                  const Gap(6),
-                  Expanded(
-                    child: _buildFlowIndicator(
-                      label: 'Expense',
-                      amount: totalLivingExpense,
-                      color: AppColors.expense,
-                      icon: Icons.arrow_upward,
-                    ),
-                  ),
-                  const Gap(6),
-                  Expanded(
-                    child: _buildFlowIndicator(
-                      label: 'Invested',
-                      amount: totalInvested,
-                      color: AppColors.investment,
-                      icon: Icons.trending_up,
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 420;
+                  if (isCompact) {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildFlowIndicator(
+                                label: 'Budget',
+                                amount: totalBudget,
+                                color: AppColors.transfer,
+                                icon: Icons.track_changes,
+                              ),
+                            ),
+                            const Gap(8),
+                            Expanded(
+                              child: _buildFlowIndicator(
+                                label: 'Income',
+                                amount: totalIncome,
+                                color: AppColors.income,
+                                icon: Icons.arrow_downward,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Gap(8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildFlowIndicator(
+                                label: 'Expense',
+                                amount: totalLivingExpense,
+                                color: AppColors.expense,
+                                icon: Icons.arrow_upward,
+                              ),
+                            ),
+                            const Gap(8),
+                            Expanded(
+                              child: _buildFlowIndicator(
+                                label: 'Invested',
+                                amount: totalInvested,
+                                color: AppColors.investment,
+                                icon: Icons.trending_up,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildFlowIndicator(
+                          label: 'Budget',
+                          amount: totalBudget,
+                          color: AppColors.transfer,
+                          icon: Icons.track_changes,
+                        ),
+                      ),
+                      const Gap(6),
+                      Expanded(
+                        child: _buildFlowIndicator(
+                          label: 'Income',
+                          amount: totalIncome,
+                          color: AppColors.income,
+                          icon: Icons.arrow_downward,
+                        ),
+                      ),
+                      const Gap(6),
+                      Expanded(
+                        child: _buildFlowIndicator(
+                          label: 'Expense',
+                          amount: totalLivingExpense,
+                          color: AppColors.expense,
+                          icon: Icons.arrow_upward,
+                        ),
+                      ),
+                      const Gap(6),
+                      Expanded(
+                        child: _buildFlowIndicator(
+                          label: 'Invested',
+                          amount: totalInvested,
+                          color: AppColors.investment,
+                          icon: Icons.trending_up,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const Gap(16),
 
@@ -380,6 +435,8 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
                   ),
                 ),
               ],
+              const Gap(14),
+              _buildExploreMoreButton(context),
             ],
           ),
         ),
@@ -559,6 +616,8 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
                   ),
                 ),
               ),
+              const Gap(14),
+              _buildExploreMoreButton(context),
             ],
           ),
         ),
@@ -566,7 +625,55 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
     );
   }
 
+  Widget _buildExploreMoreButton(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FinancialReportScreen(
+              initialIsYearly: _isYearly,
+              initialDate: _selectedDate,
+              initialYear: _selectedYear,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.analytics_outlined, size: 16, color: AppColors.primaryLight),
+            Gap(6),
+            Text(
+              'Explore Detailed Report & Analytics',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryLight,
+              ),
+            ),
+            Gap(4),
+            Icon(Icons.chevron_right, size: 16, color: AppColors.primaryLight),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeader(String periodTitle, bool isCurrentPeriod, double netSavings, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated;
+    final borderColor = isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder;
+    final iconColor = theme.colorScheme.onSurface;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -578,19 +685,19 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
             Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: AppColors.darkSurfaceElevated,
+                color: surfaceColor,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.darkCardBorder),
+                border: Border.all(color: borderColor),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildSegmentButton('Monthly', !_isYearly, () {
                     if (_isYearly) setState(() => _isYearly = false);
-                  }),
+                  }, isDark),
                   _buildSegmentButton('Yearly', _isYearly, () {
                     if (!_isYearly) setState(() => _isYearly = true);
-                  }),
+                  }, isDark),
                 ],
               ),
             ),
@@ -627,32 +734,35 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
                   onTap: _previousPeriod,
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.darkSurfaceElevated,
-                      border: Border.all(color: AppColors.darkCardBorder),
+                      color: surfaceColor,
+                      border: Border.all(color: borderColor),
                     ),
-                    child: const Icon(Icons.chevron_left, size: 18),
+                    child: Icon(Icons.chevron_left, size: 18, color: iconColor),
                   ),
                 ),
                 const Gap(8),
                 Text(
                   periodTitle,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
                 const Gap(8),
                 InkWell(
                   onTap: _nextPeriod,
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(5),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.darkSurfaceElevated,
-                      border: Border.all(color: AppColors.darkCardBorder),
+                      color: surfaceColor,
+                      border: Border.all(color: borderColor),
                     ),
-                    child: const Icon(Icons.chevron_right, size: 18),
+                    child: Icon(Icons.chevron_right, size: 18, color: iconColor),
                   ),
                 ),
               ],
@@ -662,7 +772,7 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
                 onTap: _resetToCurrent,
                 borderRadius: BorderRadius.circular(6),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -687,7 +797,7 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
     );
   }
 
-  Widget _buildSegmentButton(String title, bool isSelected, VoidCallback onTap) {
+  Widget _buildSegmentButton(String title, bool isSelected, VoidCallback onTap, bool isDark) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -702,7 +812,7 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? Colors.white : Colors.grey,
+            color: isSelected ? Colors.white : (isDark ? Colors.grey : AppColors.lightTextSecondary),
           ),
         ),
       ),
@@ -716,35 +826,43 @@ class _CashFlowChartState extends ConsumerState<CashFlowChart> {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: color.withValues(alpha: 0.2),
-            child: Icon(icon, size: 12, color: color),
-          ),
-          const Gap(6),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 10,
+                backgroundColor: color.withValues(alpha: 0.2),
+                child: Icon(icon, size: 11, color: color),
+              ),
+              const Gap(5),
+              Expanded(
+                child: Text(
                   label,
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  CurrencyFormatter.formatCompact(amount),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
+            ],
+          ),
+          const Gap(5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              CurrencyFormatter.format(amount),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
           ),
         ],

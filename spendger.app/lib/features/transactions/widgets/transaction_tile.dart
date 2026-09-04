@@ -15,6 +15,7 @@ class TransactionTile extends ConsumerWidget {
   final Category? category;
   final Account? account;
   final Account? toAccount;
+  final bool isDismissible;
 
   const TransactionTile({
     super.key,
@@ -22,6 +23,7 @@ class TransactionTile extends ConsumerWidget {
     this.category,
     this.account,
     this.toAccount,
+    this.isDismissible = true,
   });
 
   @override
@@ -44,6 +46,113 @@ class TransactionTile extends ConsumerWidget {
         ? Colors.lightBlueAccent
         : (category != null ? Color(category!.colorValue) : Colors.grey);
 
+    final cardContent = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).dividerTheme.color ?? Colors.white10),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          if (!isTransfer) {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => QuickAddSheet(transactionToEdit: transaction),
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: avatarColor.withValues(alpha: 0.15),
+                child: Icon(
+                  avatarIcon,
+                  size: 20,
+                  color: avatarColor,
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      titleText,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Gap(2),
+                    Row(
+                      children: [
+                        if (isTransfer) ...[
+                          if (account != null || toAccount != null) ...[
+                            Flexible(
+                              child: Text(
+                                '${account?.name ?? "Account"} → ${toAccount?.name ?? "Account"}',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
+                        ] else if (account != null) ...[
+                          Flexible(
+                            child: Text(
+                              account!.name,
+                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                        Text(
+                          DateFormat('hh:mm a').format(transaction.transactionDate),
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        if (!isTransfer && transaction.notes != null && transaction.notes!.isNotEmpty) ...[
+                          const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Expanded(
+                            child: Text(
+                              transaction.notes!,
+                              style: const TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Gap(8),
+              Text(
+                '$prefix ${CurrencyFormatter.format(transaction.amount)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: amountColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!isDismissible) {
+      return cardContent;
+    }
+
     return Dismissible(
       key: Key(transaction.id),
       direction: DismissDirection.endToStart,
@@ -59,108 +168,7 @@ class TransactionTile extends ConsumerWidget {
           const SnackBar(content: Text('Transaction deleted')),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).dividerTheme.color ?? Colors.white10),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () {
-            if (!isTransfer) {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (_) => QuickAddSheet(transactionToEdit: transaction),
-              );
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: avatarColor.withValues(alpha: 0.15),
-                  child: Icon(
-                    avatarIcon,
-                    size: 20,
-                    color: avatarColor,
-                  ),
-                ),
-                const Gap(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        titleText,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Gap(2),
-                      Row(
-                        children: [
-                          if (isTransfer) ...[
-                            if (account != null || toAccount != null) ...[
-                              Flexible(
-                                child: Text(
-                                  '${account?.name ?? "Account"} → ${toAccount?.name ?? "Account"}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                              ),
-                              const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ] else if (account != null) ...[
-                            Flexible(
-                              child: Text(
-                                account!.name,
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                            const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          ],
-                          Text(
-                            DateFormat('hh:mm a').format(transaction.transactionDate),
-                            style: const TextStyle(fontSize: 11, color: Colors.grey),
-                          ),
-                          if (!isTransfer && transaction.notes != null && transaction.notes!.isNotEmpty) ...[
-                            const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            Expanded(
-                              child: Text(
-                                transaction.notes!,
-                                style: const TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const Gap(8),
-                Text(
-                  '$prefix ${CurrencyFormatter.format(transaction.amount)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: amountColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      child: cardContent,
     );
   }
 }

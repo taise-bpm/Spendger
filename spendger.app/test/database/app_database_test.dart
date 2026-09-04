@@ -525,8 +525,67 @@ void main() {
       expect(octBudgets.firstWhere((b) => b.categoryId == cat1.id).allocatedAmount, equals(7500.0));
       expect(octBudgets.firstWhere((b) => b.categoryId == cat2.id).allocatedAmount, equals(3200.0));
     });
+
+    test('Financial report category breakdown and descending ranking aggregation', () async {
+      final categories = await db.getAllCategories(type: 'expense');
+      final catA = categories[0];
+      final catB = categories[1];
+      final catC = categories.length > 2 ? categories[2] : categories[0];
+      final accounts = await db.getAllAccounts();
+      final acc = accounts.first;
+      const uuid = Uuid();
+
+      // Insert 3 transactions for November 2026: catA = 12000, catB = 25000, catC = 5000
+      await db.addTransactionWithAccountUpdate(TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: catA.id,
+        accountId: drift.Value(acc.id),
+        amount: 12000.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 11, 5),
+        createdAt: DateTime(2026, 11, 5),
+      ));
+
+      await db.addTransactionWithAccountUpdate(TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: catB.id,
+        accountId: drift.Value(acc.id),
+        amount: 25000.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 11, 12),
+        createdAt: DateTime(2026, 11, 12),
+      ));
+
+      await db.addTransactionWithAccountUpdate(TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: catC.id,
+        accountId: drift.Value(acc.id),
+        amount: 5000.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 11, 20),
+        createdAt: DateTime(2026, 11, 20),
+      ));
+
+      final novTx = await db.watchTransactionsForMonth(2026, 11).first;
+      final expenseTx = novTx.where((t) => t.type == 'expense').toList();
+
+      final Map<String, double> categorySums = {};
+      for (final tx in expenseTx) {
+        categorySums[tx.categoryId] = (categorySums[tx.categoryId] ?? 0.0) + tx.amount;
+      }
+
+      final sortedEntries = categorySums.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      // Highest should be catB (25000), followed by catA (12000), then catC (5000)
+      expect(sortedEntries.first.key, equals(catB.id));
+      expect(sortedEntries.first.value, equals(25000.0));
+      expect(sortedEntries[1].key, equals(catA.id));
+      expect(sortedEntries[1].value, equals(12000.0));
+    });
   });
 }
+
 
 
 
