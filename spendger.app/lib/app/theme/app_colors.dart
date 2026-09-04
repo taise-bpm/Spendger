@@ -18,6 +18,10 @@ class AppColors {
   static const expenseLight = Color(0xFFFB7185);
   static const expenseBg = Color(0xFF881337);
 
+  static const transfer = Color(0xFF0EA5E9); // Sky / Blue
+  static const transferLight = Color(0xFF38BDF8);
+  static const transferBg = Color(0xFF0C4A6E);
+
   static const loan = Color(0xFFF59E0B); // Amber
   static const loanLight = Color(0xFFFBBF24);
   static const loanBg = Color(0xFF78350F);

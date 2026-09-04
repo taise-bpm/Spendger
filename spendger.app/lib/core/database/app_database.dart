@@ -359,6 +359,21 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
+  Stream<List<Transaction>> watchTransactionsForYear(int year) {
+    final start = DateTime(year, 1, 1);
+    final end = DateTime(year, 12, 31, 23, 59, 59);
+    return (select(transactions)
+          ..where((t) => t.transactionDate.isBiggerOrEqualValue(start) & t.transactionDate.isSmallerOrEqualValue(end))
+          ..orderBy([(t) => OrderingTerm(expression: t.transactionDate, mode: OrderingMode.asc)]))
+        .watch();
+  }
+
+  Stream<List<Transaction>> watchAllTransactions() {
+    return (select(transactions)
+          ..orderBy([(t) => OrderingTerm(expression: t.transactionDate, mode: OrderingMode.desc)]))
+        .watch();
+  }
+
   Future<void> addTransactionWithAccountUpdate(TransactionsCompanion tx) async {
     await transaction(() async {
       await into(transactions).insert(tx);
@@ -734,6 +749,94 @@ class AppDatabase extends _$AppDatabase {
   // Budgets
   Stream<List<Budget>> watchBudgetsForMonth(int year, int month) {
     return (select(budgets)..where((b) => b.periodYear.equals(year) & b.periodMonth.equals(month))).watch();
+  }
+
+  Stream<List<Budget>> watchAllBudgets() {
+    return (select(budgets)..orderBy([
+      (b) => OrderingTerm(expression: b.periodYear, mode: OrderingMode.desc),
+      (b) => OrderingTerm(expression: b.periodMonth, mode: OrderingMode.desc),
+    ])).watch();
+  }
+
+  Future<({int year, int month, List<Budget> budgets})?> getLatestBudgetedMonthBefore(int year, int month) async {
+    final allBudgets = await (select(budgets)
+          ..where((b) => b.periodYear.isSmallerThanValue(year) |
+                         (b.periodYear.equals(year) & b.periodMonth.isSmallerThanValue(month)))
+          ..orderBy([
+            (b) => OrderingTerm(expression: b.periodYear, mode: OrderingMode.desc),
+            (b) => OrderingTerm(expression: b.periodMonth, mode: OrderingMode.desc),
+          ]))
+        .get();
+
+    if (allBudgets.isEmpty) return null;
+
+    final first = allBudgets.first;
+    final latestYear = first.periodYear;
+    final latestMonth = first.periodMonth;
+
+    final latestBudgets = allBudgets
+        .where((b) => b.periodYear == latestYear && b.periodMonth == latestMonth)
+        .toList();
+
+    return (year: latestYear, month: latestMonth, budgets: latestBudgets);
+  }
+
+  Future<void> copyOrRecreateBudgets({
+    required int fromYear,
+    required int fromMonth,
+    required int toYear,
+    required int toMonth,
+    required bool carryUnspentSurplus,
+  }) async {
+    final sourceBudgets = await (select(budgets)
+          ..where((b) => b.periodYear.equals(fromYear) & b.periodMonth.equals(fromMonth)))
+        .get();
+    if (sourceBudgets.isEmpty) return;
+
+    final fromStart = DateTime(fromYear, fromMonth, 1);
+    final fromEnd = fromMonth == 12 ? DateTime(fromYear + 1, 1, 1) : DateTime(fromYear, fromMonth + 1, 1);
+
+    final sourceTransactions = await (select(transactions)
+          ..where((t) =>
+              t.transactionDate.isBiggerOrEqualValue(fromStart) &
+              t.transactionDate.isSmallerThanValue(fromEnd) &
+              t.type.equals('expense')))
+        .get();
+
+    for (final sb in sourceBudgets) {
+      double allocated = sb.allocatedAmount;
+      if (carryUnspentSurplus) {
+        final spent = sourceTransactions
+            .where((t) => t.categoryId == sb.categoryId)
+            .fold(0.0, (sum, t) => sum + t.amount);
+        final unspent = sb.allocatedAmount - spent;
+        if (unspent > 0) {
+          allocated += unspent;
+        }
+      }
+
+      await setOrUpdateBudget(
+        categoryId: sb.categoryId,
+        year: toYear,
+        month: toMonth,
+        allocatedAmount: allocated,
+        rolloverEnabled: sb.rolloverEnabled,
+      );
+    }
+  }
+
+  Future<void> setOrUpdateBudgetsBatch(
+    List<({String categoryId, int year, int month, double allocatedAmount, bool rolloverEnabled})> items,
+  ) async {
+    for (final item in items) {
+      await setOrUpdateBudget(
+        categoryId: item.categoryId,
+        year: item.year,
+        month: item.month,
+        allocatedAmount: item.allocatedAmount,
+        rolloverEnabled: item.rolloverEnabled,
+      );
+    }
   }
 
   Future<void> setOrUpdateBudget({

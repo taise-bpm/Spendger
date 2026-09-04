@@ -14,12 +14,14 @@ class TransactionTile extends ConsumerWidget {
   final Transaction transaction;
   final Category? category;
   final Account? account;
+  final Account? toAccount;
 
   const TransactionTile({
     super.key,
     required this.transaction,
     this.category,
     this.account,
+    this.toAccount,
   });
 
   @override
@@ -102,7 +104,19 @@ class TransactionTile extends ConsumerWidget {
                       const Gap(2),
                       Row(
                         children: [
-                          if (account != null) ...[
+                          if (isTransfer) ...[
+                            if (account != null || toAccount != null) ...[
+                              Flexible(
+                                child: Text(
+                                  '${account?.name ?? "Account"} → ${toAccount?.name ?? "Account"}',
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            ],
+                          ] else if (account != null) ...[
                             Flexible(
                               child: Text(
                                 account!.name,

@@ -4,10 +4,13 @@ import 'package:gap/gap.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../core/database/app_database.dart';
 import '../../core/providers/database_provider.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/icon_helper.dart';
 import 'widgets/add_budget_dialog.dart';
+import 'widgets/create_from_expenses_sheet.dart';
+import 'widgets/recreate_budget_sheet.dart';
 
 class BudgetsScreen extends ConsumerStatefulWidget {
   const BudgetsScreen({super.key});
@@ -19,15 +22,46 @@ class BudgetsScreen extends ConsumerStatefulWidget {
 class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
   DateTime _currentMonth = DateTime.now();
 
+  void _openRecreateSheet(({int year, int month, List<Budget> budgets}) priorMonthData) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RecreateBudgetSheet(
+        sourceYear: priorMonthData.year,
+        sourceMonth: priorMonthData.month,
+        sourceBudgets: priorMonthData.budgets,
+        targetYear: _currentMonth.year,
+        targetMonth: _currentMonth.month,
+      ),
+    );
+  }
+
+  void _openCreateFromExpensesSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CreateFromExpensesSheet(
+        targetYear: _currentMonth.year,
+        targetMonth: _currentMonth.month,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final budgetsAsync = ref.watch(monthlyBudgetsProvider((year: _currentMonth.year, month: _currentMonth.month)));
     final transactionsAsync = ref.watch(monthlyTransactionsProvider((year: _currentMonth.year, month: _currentMonth.month)));
     final categoriesAsync = ref.watch(categoriesStreamProvider('expense'));
+    final priorMonthAsync = ref.watch(
+      latestPriorBudgetedMonthProvider((year: _currentMonth.year, month: _currentMonth.month)),
+    );
 
     final budgets = budgetsAsync.value ?? [];
     final transactions = transactionsAsync.value ?? [];
     final categories = categoriesAsync.value ?? [];
+    final priorMonthData = priorMonthAsync.value;
 
     final catMap = {for (var c in categories) c.id: c};
 
@@ -50,7 +84,19 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
         title: const Text('Budget Studio', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
+            icon: const Icon(Icons.calculate_outlined, color: AppColors.secondary),
+            tooltip: 'Auto-Budget from Past Expenses',
+            onPressed: _openCreateFromExpensesSheet,
+          ),
+          if (priorMonthData != null)
+            IconButton(
+              icon: const Icon(Icons.auto_mode_rounded, color: AppColors.primaryLight),
+              tooltip: 'Recreate / Rollover Budgets',
+              onPressed: () => _openRecreateSheet(priorMonthData),
+            ),
+          IconButton(
             icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryLight, size: 28),
+            tooltip: 'Add Budget Limit',
             onPressed: () {
               showDialog(
                 context: context,
@@ -94,6 +140,7 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ],
             ),
           ),
+
           // Total Monthly Overview Card
           if (budgets.isNotEmpty)
             Padding(
@@ -160,34 +207,79 @@ class _BudgetsScreenState extends ConsumerState<BudgetsScreen> {
               ),
             ),
           const Gap(8),
-          // Budgets List
+
+          // Budgets List / Empty State
           Expanded(
             child: budgets.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.pie_chart_outline, size: 54, color: Colors.grey.withValues(alpha: 0.4)),
-                        const Gap(12),
-                        const Text(
-                          'No budgets set for this month',
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                        const Gap(8),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => AddBudgetDialog(
-                                year: _currentMonth.year,
-                                month: _currentMonth.month,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.pie_chart_outline, size: 54, color: Colors.grey.withValues(alpha: 0.4)),
+                          const Gap(12),
+                          Text(
+                            'No budgets set for ${DateFormat('MMMM yyyy').format(_currentMonth)}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w600),
+                          ),
+                          const Gap(16),
+
+                          // Option 1: Recreate from Prior Month (if prior month exists)
+                          if (priorMonthData != null) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                onPressed: () => _openRecreateSheet(priorMonthData),
+                                icon: const Icon(Icons.auto_mode_rounded),
+                                label: Text(
+                                  'Recreate from ${DateFormat('MMM yyyy').format(DateTime(priorMonthData.year, priorMonthData.month))}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Set Budget Limit'),
-                        ),
-                      ],
+                            ),
+                            const Gap(8),
+                          ],
+
+                          // Option 2: Auto-budget from past expenses
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              onPressed: _openCreateFromExpensesSheet,
+                              icon: const Icon(Icons.calculate_outlined, color: AppColors.secondary),
+                              label: const Text(
+                                'Calculate & Create from Past Expenses',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                          const Gap(8),
+
+                          // Option 3: Manual Add
+                          TextButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (_) => AddBudgetDialog(
+                                  year: _currentMonth.year,
+                                  month: _currentMonth.month,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Set Single Category Limit'),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : ListView.builder(

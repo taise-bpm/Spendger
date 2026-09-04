@@ -393,5 +393,140 @@ void main() {
       list = await db.getAllLoanComparisons();
       expect(list.isEmpty, isTrue);
     });
+
+    test('watchTransactionsForYear and watchAllTransactions query transactions properly', () async {
+      final accounts = await db.getAllAccounts();
+      final categories = await db.getAllCategories(type: 'expense');
+      final acc = accounts.first;
+      final cat = categories.first;
+      const uuid = Uuid();
+
+      final tx2025 = TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: cat.id,
+        accountId: drift.Value(acc.id),
+        amount: 500.0,
+        type: 'expense',
+        transactionDate: DateTime(2025, 6, 15),
+        createdAt: DateTime(2025, 6, 15),
+      );
+
+      final tx2026 = TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: cat.id,
+        accountId: drift.Value(acc.id),
+        amount: 800.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 3, 20),
+        createdAt: DateTime(2026, 3, 20),
+      );
+
+      await db.addTransactionWithAccountUpdate(tx2025);
+      await db.addTransactionWithAccountUpdate(tx2026);
+
+      final allTx = await db.watchAllTransactions().first;
+      expect(allTx.length, greaterThanOrEqualTo(2));
+
+      final txYear2025 = await db.watchTransactionsForYear(2025).first;
+      expect(txYear2025.any((t) => t.id == tx2025.id.value), isTrue);
+      expect(txYear2025.any((t) => t.id == tx2026.id.value), isFalse);
+
+      final txYear2026 = await db.watchTransactionsForYear(2026).first;
+      expect(txYear2026.any((t) => t.id == tx2026.id.value), isTrue);
+      expect(txYear2026.any((t) => t.id == tx2025.id.value), isFalse);
+    });
+
+    test('Budget recreate and unspent carryover works correctly', () async {
+      final categories = await db.getAllCategories(type: 'expense');
+      final cat1 = categories[0];
+      final cat2 = categories[1];
+      final accounts = await db.getAllAccounts();
+      final acc = accounts.first;
+      const uuid = Uuid();
+
+      // Set budgets for July 2026 (Month 7)
+      await db.setOrUpdateBudget(
+        categoryId: cat1.id,
+        year: 2026,
+        month: 7,
+        allocatedAmount: 10000.0,
+        rolloverEnabled: true,
+      );
+      await db.setOrUpdateBudget(
+        categoryId: cat2.id,
+        year: 2026,
+        month: 7,
+        allocatedAmount: 5000.0,
+        rolloverEnabled: false,
+      );
+
+      // Spend 6000 in cat1 (leaving 4000 unspent) and 5500 in cat2 (overspent by 500)
+      final tx1 = TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: cat1.id,
+        accountId: drift.Value(acc.id),
+        amount: 6000.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 7, 10),
+        createdAt: DateTime(2026, 7, 10),
+      );
+      final tx2 = TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: cat2.id,
+        accountId: drift.Value(acc.id),
+        amount: 5500.0,
+        type: 'expense',
+        transactionDate: DateTime(2026, 7, 15),
+        createdAt: DateTime(2026, 7, 15),
+      );
+      await db.addTransactionWithAccountUpdate(tx1);
+      await db.addTransactionWithAccountUpdate(tx2);
+
+      // Test searching for previous budgeted month when on Sept 2026 (Month 9, August has no budgets)
+      final prior = await db.getLatestBudgetedMonthBefore(2026, 9);
+      expect(prior, isNotNull);
+      expect(prior!.year, equals(2026));
+      expect(prior.month, equals(7));
+      expect(prior.budgets.length, equals(2));
+
+      // Recreate to August 2026 with carry unspent surplus
+      await db.copyOrRecreateBudgets(
+        fromYear: 7 == 12 ? 2025 : 2026,
+        fromMonth: 7,
+        toYear: 2026,
+        toMonth: 8,
+        carryUnspentSurplus: true,
+      );
+
+      final augBudgets = await db.watchBudgetsForMonth(2026, 8).first;
+      expect(augBudgets.length, equals(2));
+
+      final augCat1 = augBudgets.firstWhere((b) => b.categoryId == cat1.id);
+      // 10000 base + 4000 unspent = 14000
+      expect(augCat1.allocatedAmount, equals(14000.0));
+
+      final augCat2 = augBudgets.firstWhere((b) => b.categoryId == cat2.id);
+      // 5000 base + 0 (overspent, no surplus) = 5000
+      expect(augCat2.allocatedAmount, equals(5000.0));
+    });
+
+    test('setOrUpdateBudgetsBatch inserts and updates multiple category budgets', () async {
+      final categories = await db.getAllCategories(type: 'expense');
+      final cat1 = categories[0];
+      final cat2 = categories[1];
+
+      await db.setOrUpdateBudgetsBatch([
+        (categoryId: cat1.id, year: 2026, month: 10, allocatedAmount: 7500.0, rolloverEnabled: false),
+        (categoryId: cat2.id, year: 2026, month: 10, allocatedAmount: 3200.0, rolloverEnabled: true),
+      ]);
+
+      final octBudgets = await db.watchBudgetsForMonth(2026, 10).first;
+      expect(octBudgets.length, equals(2));
+      expect(octBudgets.firstWhere((b) => b.categoryId == cat1.id).allocatedAmount, equals(7500.0));
+      expect(octBudgets.firstWhere((b) => b.categoryId == cat2.id).allocatedAmount, equals(3200.0));
+    });
   });
 }
+
+
+
