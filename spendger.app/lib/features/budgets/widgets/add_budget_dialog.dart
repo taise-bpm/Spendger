@@ -99,10 +99,13 @@ class _AddBudgetDialogState extends ConsumerState<AddBudgetDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Edit Category Budget' : 'Set Category Budget', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Gap(8),
             const Text('Select Category', style: TextStyle(fontSize: 12, color: Colors.grey)),
             const Gap(6),
             DropdownButtonFormField<String>(

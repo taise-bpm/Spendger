@@ -19,10 +19,16 @@ final categoriesStreamProvider = StreamProvider.autoDispose.family<List<Category
   return db.watchCategories(type: type);
 });
 
-// Accounts Stream
+// Accounts Stream (All accounts)
 final accountsStreamProvider = StreamProvider.autoDispose<List<Account>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAccounts();
+});
+
+// Active Accounts Stream (Only active in-use accounts)
+final activeAccountsStreamProvider = StreamProvider.autoDispose<List<Account>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchAccounts(onlyActive: true);
 });
 
 // Transactions Stream
@@ -51,6 +57,11 @@ final loansStreamProvider = StreamProvider.autoDispose.family<List<EmiLoan>, Str
 final loanPaymentsStreamProvider = StreamProvider.autoDispose.family<List<EmiPayment>, String>((ref, loanId) {
   final db = ref.watch(databaseProvider);
   return db.watchPaymentsForLoan(loanId);
+});
+
+final loanComparisonsStreamProvider = StreamProvider.autoDispose<List<LoanComparison>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchLoanComparisons();
 });
 
 // Investments Stream

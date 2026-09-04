@@ -26,9 +26,12 @@ class RemindersScreen extends ConsumerWidget {
         builder: (dialogCtx, setState) => AlertDialog(
           title: const Text('Add Payment Reminder', style: TextStyle(fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
+            clipBehavior: Clip.none,
+            padding: const EdgeInsets.only(top: 8, bottom: 8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Gap(6),
                 TextField(
                   controller: titleController,
                   decoration: const InputDecoration(

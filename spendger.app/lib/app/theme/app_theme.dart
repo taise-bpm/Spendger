@@ -49,6 +49,11 @@ class AppTheme {
         color: AppColors.darkCardBorder,
         thickness: 1,
       ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titleTextStyle: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.darkSurfaceElevated,
@@ -114,6 +119,11 @@ class AppTheme {
       dividerTheme: const DividerThemeData(
         color: AppColors.lightCardBorder,
         thickness: 1,
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titleTextStyle: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

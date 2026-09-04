@@ -141,6 +141,8 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
       content: SizedBox(
         width: MediaQuery.of(context).size.width * 0.9,
         child: SingleChildScrollView(
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -23,6 +23,7 @@ void main() {
       expect(categories.isNotEmpty, isTrue);
       expect(accounts.isNotEmpty, isTrue);
       expect(categories.any((c) => c.name == 'Food & Dining'), isTrue);
+      expect(categories.any((c) => c.name == 'Loan Disbursement' && c.type == 'income'), isTrue);
     });
 
     test('addTransactionWithAccountUpdate inserts transaction and updates account balance', () async {
@@ -181,6 +182,80 @@ void main() {
       expect(rolledBackAccounts.firstWhere((a) => a.id == toAcc.id).currentBalance, equals(initialToBalance));
     });
 
+    test('recordCreditCardBillPayment settles credit card balance from bank account', () async {
+      final accounts = await db.getAllAccounts();
+      final bankAcc = accounts.firstWhere((a) => a.accountType == 'bank');
+      final cardAcc = accounts.firstWhere((a) => a.accountType == 'card' || a.accountType == 'credit_card');
+      
+      final initialBankBalance = bankAcc.currentBalance;
+      final initialCardBalance = cardAcc.currentBalance; // e.g. -5000 or whatever seeded
+
+      await db.recordCreditCardBillPayment(
+        fromAccountId: bankAcc.id,
+        creditCardAccountId: cardAcc.id,
+        amount: 2500.0,
+        date: DateTime.now(),
+        note: 'HDFC Credit Card Bill Payment',
+      );
+
+      final updatedAccounts = await db.getAllAccounts();
+      final updatedBank = updatedAccounts.firstWhere((a) => a.id == bankAcc.id);
+      final updatedCard = updatedAccounts.firstWhere((a) => a.id == cardAcc.id);
+
+      // Bank debited, Card credited (debt reduced)
+      expect(updatedBank.currentBalance, equals(initialBankBalance - 2500.0));
+      expect(updatedCard.currentBalance, equals(initialCardBalance + 2500.0));
+
+      final recentTx = await db.watchRecentTransactions(limit: 1).first;
+      expect(recentTx.first.type, equals('transfer'));
+      expect(recentTx.first.notes, contains('Credit Card Bill Payment'));
+    });
+
+    test('Credit Card with defaultPayFromAccountId supports automatic pay-from source link', () async {
+      final accounts = await db.getAllAccounts();
+      final bankAcc = accounts.firstWhere((a) => a.accountType == 'bank');
+
+      const uuid = Uuid();
+      final cardId = uuid.v4();
+
+      // Create new credit card with bankAcc as default pay from account
+      await db.upsertAccount(
+        AccountsCompanion(
+          id: drift.Value(cardId),
+          name: const drift.Value('Amazon ICICI Credit Card'),
+          accountType: const drift.Value('credit_card'),
+          currentBalance: const drift.Value(-8500.0),
+          creditLimit: const drift.Value(200000.0),
+          defaultPayFromAccountId: drift.Value(bankAcc.id),
+          isActive: const drift.Value(true),
+          iconCode: const drift.Value(0xe19f),
+          colorValue: const drift.Value(0xFFF43F5E),
+        ),
+      );
+
+      final fetchedCard = (await db.getAllAccounts()).firstWhere((a) => a.id == cardId);
+      expect(fetchedCard.defaultPayFromAccountId, equals(bankAcc.id));
+      expect(fetchedCard.creditLimit, equals(200000.0));
+      expect(fetchedCard.currentBalance, equals(-8500.0));
+
+      // Perform quick pay full due using the default pay from account
+      final initialBankBal = (await db.getAllAccounts()).firstWhere((a) => a.id == bankAcc.id).currentBalance;
+      await db.recordCreditCardBillPayment(
+        fromAccountId: fetchedCard.defaultPayFromAccountId!,
+        creditCardAccountId: fetchedCard.id,
+        amount: fetchedCard.currentBalance.abs(),
+        date: DateTime.now(),
+        note: '${fetchedCard.name} Quick Bill Payment',
+      );
+
+      final afterPayAccounts = await db.getAllAccounts();
+      final paidCard = afterPayAccounts.firstWhere((a) => a.id == cardId);
+      final debitedBank = afterPayAccounts.firstWhere((a) => a.id == bankAcc.id);
+
+      expect(paidCard.currentBalance, equals(0.0));
+      expect(debitedBank.currentBalance, equals(initialBankBal - 8500.0));
+    });
+
     test('postPpfAnnualInterest updates PPF valuation and logs annual statement interest', () async {
       const uuid = Uuid();
       final ppfId = uuid.v4();
@@ -211,6 +286,112 @@ void main() {
       expect(ledger.length, equals(1));
       expect(ledger.first.amount, equals(10650.0));
       expect(ledger.first.type, equals('income'));
+    });
+
+    test('createLoanWithDisbursal inserts loan, credits bank account with net funds, and rollbacks on delete', () async {
+      final accounts = await db.getAllAccounts();
+      final bankAcc = accounts.firstWhere((a) => a.accountType == 'bank');
+      final initialBankBalance = bankAcc.currentBalance;
+
+      const uuid = Uuid();
+      final loanId = uuid.v4();
+
+      // Principal: 200,000, Processing fee: 1.5% (+18% GST -> 3540 fee) -> Net: 196,460
+      final loanCompanion = EmiLoansCompanion.insert(
+        id: loanId,
+        productName: 'HDFC Personal Loan',
+        principalAmount: 200000.0,
+        annualInterestRate: 11.5,
+        tenureMonths: 24,
+        monthlyEmi: 9368.0,
+        startDate: DateTime.now(),
+        loanCategory: const drift.Value('personal_bank'),
+        disbursedAccountId: drift.Value(bankAcc.id),
+        processingFee: const drift.Value(1.5),
+        isProcessingFeePercentage: const drift.Value(true),
+        netDisbursedAmount: const drift.Value(196460.0),
+        createdAt: DateTime.now(),
+      );
+
+      await db.createLoanWithDisbursal(
+        loan: loanCompanion,
+        disburseToAccount: true,
+        destinationAccountId: bankAcc.id,
+        netDisbursalAmount: 196460.0,
+      );
+
+      // Verify Loan created
+      final loans = await db.watchLoans(status: 'active').first;
+      expect(loans.any((l) => l.id == loanId), isTrue);
+
+      // Verify Bank Account credited with net funds
+      final updatedAccounts = await db.getAllAccounts();
+      final updatedBank = updatedAccounts.firstWhere((a) => a.id == bankAcc.id);
+      expect(updatedBank.currentBalance, equals(initialBankBalance + 196460.0));
+
+      // Verify Disbursal Transaction created with 'Loan Disbursement' category
+      final recentTx = await db.watchRecentTransactions(limit: 1).first;
+      expect(recentTx.first.tag, equals('LOAN_DISBURSE:$loanId'));
+      expect(recentTx.first.type, equals('income'));
+      expect(recentTx.first.amount, equals(196460.0));
+      final allCats = await db.getAllCategories();
+      final disbursalCat = allCats.firstWhere((c) => c.name == 'Loan Disbursement');
+      expect(recentTx.first.categoryId, equals(disbursalCat.id));
+
+      // Delete loan and verify bank balance reverted
+      await db.deleteLoan(loanId);
+      final revertedAccounts = await db.getAllAccounts();
+      final revertedBank = revertedAccounts.firstWhere((a) => a.id == bankAcc.id);
+      expect(revertedBank.currentBalance, equals(initialBankBalance));
+    });
+
+    test('LoanComparisons CRUD operations work seamlessly', () async {
+      const uuid = Uuid();
+      final comp1 = LoanComparisonsCompanion.insert(
+        id: uuid.v4(),
+        groupName: const drift.Value('Test Group'),
+        lenderName: 'Axis Bank Personal',
+        loanCategory: const drift.Value('personal_bank'),
+        principalAmount: 300000.0,
+        annualInterestRate: 10.25,
+        tenureMonths: 36,
+        processingFee: const drift.Value(1.0),
+        isProcessingFeePercentage: const drift.Value(true),
+        gstRateOnFees: const drift.Value(18.0),
+        createdAt: DateTime.now(),
+      );
+
+      final comp2 = LoanComparisonsCompanion.insert(
+        id: uuid.v4(),
+        groupName: const drift.Value('Test Group'),
+        lenderName: 'Friend Interest-Free Loan',
+        loanCategory: const drift.Value('friend_family'),
+        principalAmount: 150000.0,
+        annualInterestRate: 0.0,
+        tenureMonths: 15,
+        processingFee: const drift.Value(0.0),
+        isProcessingFeePercentage: const drift.Value(false),
+        gstRateOnFees: const drift.Value(18.0),
+        createdAt: DateTime.now(),
+      );
+
+      // Upsert
+      await db.upsertLoanComparison(comp1);
+      await db.upsertLoanComparison(comp2);
+
+      var list = await db.getAllLoanComparisons();
+      expect(list.length, equals(2));
+
+      // Delete single
+      await db.deleteLoanComparison(comp1.id.value);
+      list = await db.getAllLoanComparisons();
+      expect(list.length, equals(1));
+      expect(list.first.id, equals(comp2.id.value));
+
+      // Clear all
+      await db.clearLoanComparisons();
+      list = await db.getAllLoanComparisons();
+      expect(list.isEmpty, isTrue);
     });
   });
 }

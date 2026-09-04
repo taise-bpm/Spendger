@@ -289,10 +289,13 @@ class _AddOrEditCategoryDialogState extends ConsumerState<_AddOrEditCategoryDial
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEditing ? 'Edit Category' : 'Add ${widget.type == 'income' ? 'Income' : 'Expense'} Category', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Gap(6),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(

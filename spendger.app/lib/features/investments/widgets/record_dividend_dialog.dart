@@ -91,6 +91,8 @@ class _RecordDividendDialogState extends ConsumerState<RecordDividendDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text('Month ${widget.installment.installmentNumber} Payment', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

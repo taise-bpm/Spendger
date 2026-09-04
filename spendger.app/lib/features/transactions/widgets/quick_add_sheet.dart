@@ -149,13 +149,61 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
     final accountsAsync = ref.watch(accountsStreamProvider);
 
     final categories = categoriesAsync.value ?? [];
-    final accounts = accountsAsync.value ?? [];
+    final accounts = accountsAsync.value ?? [];    
+    final availableAccounts = accounts.where((a) => a.isActive || a.id == _selectedAccountId).toList();
 
-    if (_selectedCategoryId == null && categories.isNotEmpty) {
-      _selectedCategoryId = categories.first.id;
+    if (_selectedAccountId == null && availableAccounts.isNotEmpty) {
+      _selectedAccountId = availableAccounts.firstWhere((a) => a.isActive, orElse: () => availableAccounts.first).id;
     }
-    if (_selectedAccountId == null && accounts.isNotEmpty) {
-      _selectedAccountId = accounts.first.id;
+
+    final accountDropdownItems = <DropdownMenuItem<String>>[];
+    for (final acc in availableAccounts) {
+      accountDropdownItems.add(
+        DropdownMenuItem(
+          value: acc.id,
+          child: Row(
+            children: [
+              Icon(
+                IconHelper.getIcon(acc.iconCode),
+                size: 16,
+                color: Color(acc.colorValue),
+              ),
+              const Gap(6),
+              Expanded(
+                child: Text(
+                  acc.isActive ? acc.name : '${acc.name} (Inactive)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: acc.isActive ? null : Colors.grey,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_selectedAccountId != null && !availableAccounts.any((a) => a.id == _selectedAccountId)) {
+      accountDropdownItems.add(
+        DropdownMenuItem(
+          value: _selectedAccountId,
+          child: const Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, size: 16, color: Colors.grey),
+              Gap(6),
+              Expanded(
+                child: Text(
+                  'Archived / Previous Account',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final theme = Theme.of(context);
@@ -173,213 +221,208 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            // Drag handle
-            Container(
-              width: 40,
+      child: Column(
+        children: [
+          // Top Handle
+          Center(
+            child: Container(
+              width: 36,
               height: 4,
               decoration: BoxDecoration(
                 color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Gap(12),
-            // Header Title / Edit indicator
-            if (_isEditing)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.edit, size: 16, color: AppColors.primaryLight),
-                    const Gap(6),
-                    Text(
-                      'Edit Transaction',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            // Type Selector Switch
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: theme.cardTheme.color,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildTypeButton(
-                      label: 'Expense',
-                      type: 'expense',
-                      color: AppColors.expense,
-                    ),
-                  ),
-                  Expanded(
-                    child: _buildTypeButton(
-                      label: 'Income',
-                      type: 'income',
-                      color: AppColors.income,
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const Gap(10),
+          // Type Toggle (Income / Expense)
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const Gap(16),
-            // Amount Display Header
-            Text(
-              _type.toUpperCase(),
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
-              ),
-            ),
-            const Gap(4),
-            Text(
-              '₹ $_amountStr',
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.w800,
-                color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
-              ),
-            ),
-            const Gap(14),
-            // Category horizontal scroll
-            SizedBox(
-              height: 42,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length + 1,
-                separatorBuilder: (_, __) => const Gap(8),
-                itemBuilder: (context, index) {
-                  if (index == categories.length) {
-                    return ActionChip(
-                      avatar: const Icon(Icons.settings, size: 15, color: AppColors.primaryLight),
-                      label: const Text('Manage Heads', style: TextStyle(fontSize: 12, color: AppColors.primaryLight)),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
-                        );
-                      },
-                    );
-                  }
-                  final cat = categories[index];
-                  final isSelected = cat.id == _selectedCategoryId;
-                  return ChoiceChip(
-                    avatar: Icon(
-                      IconHelper.getIcon(cat.iconCode),
-                      size: 16,
-                      color: isSelected ? Colors.white : Color(cat.colorValue),
-                    ),
-                    label: Text(cat.name),
-                    selected: isSelected,
-                    selectedColor: Color(cat.colorValue),
-                    onSelected: (val) {
-                      setState(() => _selectedCategoryId = cat.id);
-                    },
-                  );
-                },
-              ),
-            ),
-            const Gap(10),
-            // Account & Date Selector Row
-            Row(
+            child: Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedAccountId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Account / Mode',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    items: accounts.map((acc) {
-                      return DropdownMenuItem(
-                        value: acc.id,
-                        child: Row(
-                          children: [
-                            Icon(
-                              IconHelper.getIcon(acc.iconCode),
-                              size: 16,
-                              color: Color(acc.colorValue),
-                            ),
-                            const Gap(6),
-                            Expanded(
-                              child: Text(
-                                acc.name,
-                                style: const TextStyle(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            ),
-                          ],
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _type = 'expense';
+                        _selectedCategoryId = null;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _type == 'expense' ? AppColors.expense : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Expense',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _type == 'expense' ? Colors.white : Colors.grey,
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setState(() => _selectedAccountId = val),
+                      ),
+                    ),
                   ),
                 ),
-                const Gap(10),
                 Expanded(
                   child: InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (picked != null) setState(() => _selectedDate = picked);
+                    onTap: () {
+                      setState(() {
+                        _type = 'income';
+                        _selectedCategoryId = null;
+                      });
                     },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Date',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _type == 'income' ? AppColors.income : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat('MMM dd, yyyy').format(_selectedDate),
-                              style: const TextStyle(fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                          const Gap(4),
-                          const Icon(Icons.calendar_today, size: 14),
-                        ],
+                      alignment: Alignment.center,
+                      child: Text(
+                        'Income',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _type == 'income' ? Colors.white : Colors.grey,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-            const Gap(10),
-            // Optional Notes
-            TextField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                hintText: 'Notes (Optional)',
-                prefixIcon: Icon(Icons.edit_note, size: 20),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          const Gap(14),
+          // Amount Display & Note field
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(
+                    '₹$_amountStr',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w800,
+                      color: _type == 'income' ? AppColors.incomeLight : AppColors.expenseLight,
+                    ),
+                  ),
+                  const Gap(14),
+                  // Category horizontal scroll
+                  SizedBox(
+                    height: 42,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categories.length + 1,
+                      separatorBuilder: (_, __) => const Gap(8),
+                      itemBuilder: (context, index) {
+                        if (index == categories.length) {
+                          return ActionChip(
+                            avatar: const Icon(Icons.settings, size: 15, color: AppColors.primaryLight),
+                            label: const Text('Manage Heads', style: TextStyle(fontSize: 12, color: AppColors.primaryLight)),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
+                              );
+                            },
+                          );
+                        }
+                        final cat = categories[index];
+                        final isSelected = cat.id == _selectedCategoryId;
+                        return ChoiceChip(
+                          avatar: Icon(
+                            IconHelper.getIcon(cat.iconCode),
+                            size: 16,
+                            color: isSelected ? Colors.white : Color(cat.colorValue),
+                          ),
+                          label: Text(cat.name),
+                          selected: isSelected,
+                          selectedColor: Color(cat.colorValue),
+                          onSelected: (val) {
+                            setState(() => _selectedCategoryId = cat.id);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  const Gap(10),
+                  // Account & Date Selector Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: _selectedAccountId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Account / Mode',
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          ),
+                          items: accountDropdownItems,
+                          onChanged: (val) => setState(() => _selectedAccountId = val),
+                        ),
+                      ),
+                      const Gap(10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                            );
+                            if (picked != null) setState(() => _selectedDate = picked);
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Date',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    DateFormat('MMM dd, yyyy').format(_selectedDate),
+                                    style: const TextStyle(fontSize: 12),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                const Gap(4),
+                                const Icon(Icons.calendar_today, size: 14),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(10),
+                  // Optional Notes
+                  TextField(
+                    controller: _notesController,
+                    decoration: const InputDecoration(
+                      hintText: 'Notes (Optional)',
+                      prefixIcon: Icon(Icons.edit_note, size: 20),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Gap(10),
-            // Keypad Grid
-            Expanded(
-              child: _buildKeypadGrid(),
-            ),
+          ),
+          const Gap(10),
+          // Keypad Grid
+          Expanded(
+            child: _buildKeypadGrid(),
+          ),
             // Save / Update Button
             SizedBox(
               width: double.infinity,
@@ -399,36 +442,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildTypeButton({required String label, required String type, required Color color}) {
-    final isSelected = _type == type;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _type = type;
-          _selectedCategoryId = null;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : Colors.grey,
-            ),
-          ),
-        ),
-      ),
-    );
+      );
   }
 
   Widget _buildKeypadGrid() {

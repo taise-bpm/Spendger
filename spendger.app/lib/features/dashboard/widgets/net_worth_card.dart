@@ -18,9 +18,14 @@ class NetWorthCard extends ConsumerWidget {
     final investments = investmentsAsync.value ?? [];
     final loans = loansAsync.value ?? [];
 
-    final double totalCash = accounts.fold(0.0, (sum, a) => sum + a.currentBalance);
+    final double totalCash = accounts
+        .where((a) => a.accountType != 'card' && a.accountType != 'credit_card')
+        .fold(0.0, (sum, a) => sum + a.currentBalance);
+    final double totalCardDebt = accounts
+        .where((a) => a.accountType == 'card' || a.accountType == 'credit_card')
+        .fold(0.0, (sum, a) => sum + a.currentBalance.abs());
     final double totalInvestments = investments.fold(0.0, (sum, i) => sum + i.currentValuation);
-    final double totalDebt = loans.fold(0.0, (sum, l) => sum + l.principalAmount);
+    final double totalDebt = loans.fold(0.0, (sum, l) => sum + l.principalAmount) + totalCardDebt;
     final double netWorth = (totalCash + totalInvestments) - totalDebt;
 
     final theme = Theme.of(context);

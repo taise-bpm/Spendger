@@ -19,6 +19,8 @@ class Accounts extends Table {
   TextColumn get accountType => text()();
   RealColumn get currentBalance => real().withDefault(const Constant(0.0))();
   RealColumn get creditLimit => real().nullable()(); // Credit card spending limit
+  TextColumn get defaultPayFromAccountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   IntColumn get iconCode => integer()();
   IntColumn get colorValue => integer()();
 
@@ -59,6 +61,7 @@ class EmiLoans extends Table {
   TextColumn get id => text()();
   TextColumn get productName => text()();
   TextColumn get lenderName => text().nullable()();
+  TextColumn get loanCategory => text().withDefault(const Constant('personal_bank'))(); // 'personal_bank', 'asset_vehicle', 'friend_family', 'other'
   RealColumn get principalAmount => real()();
   RealColumn get annualInterestRate => real()();
   IntColumn get tenureMonths => integer()();
@@ -67,6 +70,10 @@ class EmiLoans extends Table {
   RealColumn get gstRateOnInterest => real().withDefault(const Constant(0.0))();
   TextColumn get expenseCategoryId => text().nullable().references(Categories, #id, onDelete: KeyAction.setNull)();
   TextColumn get defaultAccountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
+  TextColumn get disbursedAccountId => text().nullable().references(Accounts, #id, onDelete: KeyAction.setNull)();
+  RealColumn get processingFee => real().withDefault(const Constant(0.0))();
+  BoolColumn get isProcessingFeePercentage => boolean().withDefault(const Constant(false))();
+  RealColumn get netDisbursedAmount => real().nullable()();
   BoolColumn get autoLogExpense => boolean().withDefault(const Constant(true))();
   TextColumn get status => text().withDefault(const Constant('active'))(); // 'active', 'closed', 'foreclosed'
   TextColumn get notes => text().nullable()();
@@ -87,6 +94,24 @@ class EmiPayments extends Table {
   RealColumn get totalAmountPaid => real()();
   BoolColumn get isPrepayment => boolean().withDefault(const Constant(false))();
   TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class LoanComparisons extends Table {
+  TextColumn get id => text()();
+  TextColumn get groupName => text().withDefault(const Constant('General Comparison'))();
+  TextColumn get lenderName => text()();
+  TextColumn get loanCategory => text().withDefault(const Constant('personal_bank'))();
+  RealColumn get principalAmount => real()();
+  RealColumn get annualInterestRate => real()();
+  IntColumn get tenureMonths => integer()();
+  RealColumn get processingFee => real().withDefault(const Constant(0.0))();
+  BoolColumn get isProcessingFeePercentage => boolean().withDefault(const Constant(false))();
+  RealColumn get gstRateOnFees => real().withDefault(const Constant(18.0))();
+  BoolColumn get isFinalized => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {id};

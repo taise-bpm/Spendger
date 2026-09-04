@@ -514,6 +514,35 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _defaultPayFromAccountIdMeta =
+      const VerificationMeta('defaultPayFromAccountId');
+  @override
+  late final GeneratedColumn<String> defaultPayFromAccountId =
+      GeneratedColumn<String>(
+        'default_pay_from_account_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES accounts (id) ON DELETE SET NULL',
+        ),
+      );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _iconCodeMeta = const VerificationMeta(
     'iconCode',
   );
@@ -543,6 +572,8 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
     accountType,
     currentBalance,
     creditLimit,
+    defaultPayFromAccountId,
+    isActive,
     iconCode,
     colorValue,
   ];
@@ -600,6 +631,21 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         ),
       );
     }
+    if (data.containsKey('default_pay_from_account_id')) {
+      context.handle(
+        _defaultPayFromAccountIdMeta,
+        defaultPayFromAccountId.isAcceptableOrUnknown(
+          data['default_pay_from_account_id']!,
+          _defaultPayFromAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
     if (data.containsKey('icon_code')) {
       context.handle(
         _iconCodeMeta,
@@ -645,6 +691,14 @@ class $AccountsTable extends Accounts with TableInfo<$AccountsTable, Account> {
         DriftSqlType.double,
         data['${effectivePrefix}credit_limit'],
       ),
+      defaultPayFromAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_pay_from_account_id'],
+      ),
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
       iconCode: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}icon_code'],
@@ -668,6 +722,8 @@ class Account extends DataClass implements Insertable<Account> {
   final String accountType;
   final double currentBalance;
   final double? creditLimit;
+  final String? defaultPayFromAccountId;
+  final bool isActive;
   final int iconCode;
   final int colorValue;
   const Account({
@@ -676,6 +732,8 @@ class Account extends DataClass implements Insertable<Account> {
     required this.accountType,
     required this.currentBalance,
     this.creditLimit,
+    this.defaultPayFromAccountId,
+    required this.isActive,
     required this.iconCode,
     required this.colorValue,
   });
@@ -689,6 +747,12 @@ class Account extends DataClass implements Insertable<Account> {
     if (!nullToAbsent || creditLimit != null) {
       map['credit_limit'] = Variable<double>(creditLimit);
     }
+    if (!nullToAbsent || defaultPayFromAccountId != null) {
+      map['default_pay_from_account_id'] = Variable<String>(
+        defaultPayFromAccountId,
+      );
+    }
+    map['is_active'] = Variable<bool>(isActive);
     map['icon_code'] = Variable<int>(iconCode);
     map['color_value'] = Variable<int>(colorValue);
     return map;
@@ -703,6 +767,10 @@ class Account extends DataClass implements Insertable<Account> {
       creditLimit: creditLimit == null && nullToAbsent
           ? const Value.absent()
           : Value(creditLimit),
+      defaultPayFromAccountId: defaultPayFromAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultPayFromAccountId),
+      isActive: Value(isActive),
       iconCode: Value(iconCode),
       colorValue: Value(colorValue),
     );
@@ -719,6 +787,10 @@ class Account extends DataClass implements Insertable<Account> {
       accountType: serializer.fromJson<String>(json['accountType']),
       currentBalance: serializer.fromJson<double>(json['currentBalance']),
       creditLimit: serializer.fromJson<double?>(json['creditLimit']),
+      defaultPayFromAccountId: serializer.fromJson<String?>(
+        json['defaultPayFromAccountId'],
+      ),
+      isActive: serializer.fromJson<bool>(json['isActive']),
       iconCode: serializer.fromJson<int>(json['iconCode']),
       colorValue: serializer.fromJson<int>(json['colorValue']),
     );
@@ -732,6 +804,10 @@ class Account extends DataClass implements Insertable<Account> {
       'accountType': serializer.toJson<String>(accountType),
       'currentBalance': serializer.toJson<double>(currentBalance),
       'creditLimit': serializer.toJson<double?>(creditLimit),
+      'defaultPayFromAccountId': serializer.toJson<String?>(
+        defaultPayFromAccountId,
+      ),
+      'isActive': serializer.toJson<bool>(isActive),
       'iconCode': serializer.toJson<int>(iconCode),
       'colorValue': serializer.toJson<int>(colorValue),
     };
@@ -743,6 +819,8 @@ class Account extends DataClass implements Insertable<Account> {
     String? accountType,
     double? currentBalance,
     Value<double?> creditLimit = const Value.absent(),
+    Value<String?> defaultPayFromAccountId = const Value.absent(),
+    bool? isActive,
     int? iconCode,
     int? colorValue,
   }) => Account(
@@ -751,6 +829,10 @@ class Account extends DataClass implements Insertable<Account> {
     accountType: accountType ?? this.accountType,
     currentBalance: currentBalance ?? this.currentBalance,
     creditLimit: creditLimit.present ? creditLimit.value : this.creditLimit,
+    defaultPayFromAccountId: defaultPayFromAccountId.present
+        ? defaultPayFromAccountId.value
+        : this.defaultPayFromAccountId,
+    isActive: isActive ?? this.isActive,
     iconCode: iconCode ?? this.iconCode,
     colorValue: colorValue ?? this.colorValue,
   );
@@ -767,6 +849,10 @@ class Account extends DataClass implements Insertable<Account> {
       creditLimit: data.creditLimit.present
           ? data.creditLimit.value
           : this.creditLimit,
+      defaultPayFromAccountId: data.defaultPayFromAccountId.present
+          ? data.defaultPayFromAccountId.value
+          : this.defaultPayFromAccountId,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
       iconCode: data.iconCode.present ? data.iconCode.value : this.iconCode,
       colorValue: data.colorValue.present
           ? data.colorValue.value
@@ -782,6 +868,8 @@ class Account extends DataClass implements Insertable<Account> {
           ..write('accountType: $accountType, ')
           ..write('currentBalance: $currentBalance, ')
           ..write('creditLimit: $creditLimit, ')
+          ..write('defaultPayFromAccountId: $defaultPayFromAccountId, ')
+          ..write('isActive: $isActive, ')
           ..write('iconCode: $iconCode, ')
           ..write('colorValue: $colorValue')
           ..write(')'))
@@ -795,6 +883,8 @@ class Account extends DataClass implements Insertable<Account> {
     accountType,
     currentBalance,
     creditLimit,
+    defaultPayFromAccountId,
+    isActive,
     iconCode,
     colorValue,
   );
@@ -807,6 +897,8 @@ class Account extends DataClass implements Insertable<Account> {
           other.accountType == this.accountType &&
           other.currentBalance == this.currentBalance &&
           other.creditLimit == this.creditLimit &&
+          other.defaultPayFromAccountId == this.defaultPayFromAccountId &&
+          other.isActive == this.isActive &&
           other.iconCode == this.iconCode &&
           other.colorValue == this.colorValue);
 }
@@ -817,6 +909,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
   final Value<String> accountType;
   final Value<double> currentBalance;
   final Value<double?> creditLimit;
+  final Value<String?> defaultPayFromAccountId;
+  final Value<bool> isActive;
   final Value<int> iconCode;
   final Value<int> colorValue;
   final Value<int> rowid;
@@ -826,6 +920,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     this.accountType = const Value.absent(),
     this.currentBalance = const Value.absent(),
     this.creditLimit = const Value.absent(),
+    this.defaultPayFromAccountId = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.iconCode = const Value.absent(),
     this.colorValue = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -836,6 +932,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     required String accountType,
     this.currentBalance = const Value.absent(),
     this.creditLimit = const Value.absent(),
+    this.defaultPayFromAccountId = const Value.absent(),
+    this.isActive = const Value.absent(),
     required int iconCode,
     required int colorValue,
     this.rowid = const Value.absent(),
@@ -850,6 +948,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Expression<String>? accountType,
     Expression<double>? currentBalance,
     Expression<double>? creditLimit,
+    Expression<String>? defaultPayFromAccountId,
+    Expression<bool>? isActive,
     Expression<int>? iconCode,
     Expression<int>? colorValue,
     Expression<int>? rowid,
@@ -860,6 +960,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       if (accountType != null) 'account_type': accountType,
       if (currentBalance != null) 'current_balance': currentBalance,
       if (creditLimit != null) 'credit_limit': creditLimit,
+      if (defaultPayFromAccountId != null)
+        'default_pay_from_account_id': defaultPayFromAccountId,
+      if (isActive != null) 'is_active': isActive,
       if (iconCode != null) 'icon_code': iconCode,
       if (colorValue != null) 'color_value': colorValue,
       if (rowid != null) 'rowid': rowid,
@@ -872,6 +975,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     Value<String>? accountType,
     Value<double>? currentBalance,
     Value<double?>? creditLimit,
+    Value<String?>? defaultPayFromAccountId,
+    Value<bool>? isActive,
     Value<int>? iconCode,
     Value<int>? colorValue,
     Value<int>? rowid,
@@ -882,6 +987,9 @@ class AccountsCompanion extends UpdateCompanion<Account> {
       accountType: accountType ?? this.accountType,
       currentBalance: currentBalance ?? this.currentBalance,
       creditLimit: creditLimit ?? this.creditLimit,
+      defaultPayFromAccountId:
+          defaultPayFromAccountId ?? this.defaultPayFromAccountId,
+      isActive: isActive ?? this.isActive,
       iconCode: iconCode ?? this.iconCode,
       colorValue: colorValue ?? this.colorValue,
       rowid: rowid ?? this.rowid,
@@ -906,6 +1014,14 @@ class AccountsCompanion extends UpdateCompanion<Account> {
     if (creditLimit.present) {
       map['credit_limit'] = Variable<double>(creditLimit.value);
     }
+    if (defaultPayFromAccountId.present) {
+      map['default_pay_from_account_id'] = Variable<String>(
+        defaultPayFromAccountId.value,
+      );
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
     if (iconCode.present) {
       map['icon_code'] = Variable<int>(iconCode.value);
     }
@@ -926,6 +1042,8 @@ class AccountsCompanion extends UpdateCompanion<Account> {
           ..write('accountType: $accountType, ')
           ..write('currentBalance: $currentBalance, ')
           ..write('creditLimit: $creditLimit, ')
+          ..write('defaultPayFromAccountId: $defaultPayFromAccountId, ')
+          ..write('isActive: $isActive, ')
           ..write('iconCode: $iconCode, ')
           ..write('colorValue: $colorValue, ')
           ..write('rowid: $rowid')
@@ -2080,6 +2198,18 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _loanCategoryMeta = const VerificationMeta(
+    'loanCategory',
+  );
+  @override
+  late final GeneratedColumn<String> loanCategory = GeneratedColumn<String>(
+    'loan_category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('personal_bank'),
+  );
   static const VerificationMeta _principalAmountMeta = const VerificationMeta(
     'principalAmount',
   );
@@ -2177,6 +2307,58 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
       'REFERENCES accounts (id) ON DELETE SET NULL',
     ),
   );
+  static const VerificationMeta _disbursedAccountIdMeta =
+      const VerificationMeta('disbursedAccountId');
+  @override
+  late final GeneratedColumn<String> disbursedAccountId =
+      GeneratedColumn<String>(
+        'disbursed_account_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES accounts (id) ON DELETE SET NULL',
+        ),
+      );
+  static const VerificationMeta _processingFeeMeta = const VerificationMeta(
+    'processingFee',
+  );
+  @override
+  late final GeneratedColumn<double> processingFee = GeneratedColumn<double>(
+    'processing_fee',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _isProcessingFeePercentageMeta =
+      const VerificationMeta('isProcessingFeePercentage');
+  @override
+  late final GeneratedColumn<bool> isProcessingFeePercentage =
+      GeneratedColumn<bool>(
+        'is_processing_fee_percentage',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_processing_fee_percentage" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _netDisbursedAmountMeta =
+      const VerificationMeta('netDisbursedAmount');
+  @override
+  late final GeneratedColumn<double> netDisbursedAmount =
+      GeneratedColumn<double>(
+        'net_disbursed_amount',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _autoLogExpenseMeta = const VerificationMeta(
     'autoLogExpense',
   );
@@ -2227,6 +2409,7 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
     id,
     productName,
     lenderName,
+    loanCategory,
     principalAmount,
     annualInterestRate,
     tenureMonths,
@@ -2235,6 +2418,10 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
     gstRateOnInterest,
     expenseCategoryId,
     defaultAccountId,
+    disbursedAccountId,
+    processingFee,
+    isProcessingFeePercentage,
+    netDisbursedAmount,
     autoLogExpense,
     status,
     notes,
@@ -2272,6 +2459,15 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
       context.handle(
         _lenderNameMeta,
         lenderName.isAcceptableOrUnknown(data['lender_name']!, _lenderNameMeta),
+      );
+    }
+    if (data.containsKey('loan_category')) {
+      context.handle(
+        _loanCategoryMeta,
+        loanCategory.isAcceptableOrUnknown(
+          data['loan_category']!,
+          _loanCategoryMeta,
+        ),
       );
     }
     if (data.containsKey('principal_amount')) {
@@ -2350,6 +2546,42 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         ),
       );
     }
+    if (data.containsKey('disbursed_account_id')) {
+      context.handle(
+        _disbursedAccountIdMeta,
+        disbursedAccountId.isAcceptableOrUnknown(
+          data['disbursed_account_id']!,
+          _disbursedAccountIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('processing_fee')) {
+      context.handle(
+        _processingFeeMeta,
+        processingFee.isAcceptableOrUnknown(
+          data['processing_fee']!,
+          _processingFeeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_processing_fee_percentage')) {
+      context.handle(
+        _isProcessingFeePercentageMeta,
+        isProcessingFeePercentage.isAcceptableOrUnknown(
+          data['is_processing_fee_percentage']!,
+          _isProcessingFeePercentageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('net_disbursed_amount')) {
+      context.handle(
+        _netDisbursedAmountMeta,
+        netDisbursedAmount.isAcceptableOrUnknown(
+          data['net_disbursed_amount']!,
+          _netDisbursedAmountMeta,
+        ),
+      );
+    }
     if (data.containsKey('auto_log_expense')) {
       context.handle(
         _autoLogExpenseMeta,
@@ -2400,6 +2632,10 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         DriftSqlType.string,
         data['${effectivePrefix}lender_name'],
       ),
+      loanCategory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}loan_category'],
+      )!,
       principalAmount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}principal_amount'],
@@ -2432,6 +2668,22 @@ class $EmiLoansTable extends EmiLoans with TableInfo<$EmiLoansTable, EmiLoan> {
         DriftSqlType.string,
         data['${effectivePrefix}default_account_id'],
       ),
+      disbursedAccountId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}disbursed_account_id'],
+      ),
+      processingFee: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}processing_fee'],
+      )!,
+      isProcessingFeePercentage: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_processing_fee_percentage'],
+      )!,
+      netDisbursedAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}net_disbursed_amount'],
+      ),
       autoLogExpense: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}auto_log_expense'],
@@ -2461,6 +2713,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
   final String id;
   final String productName;
   final String? lenderName;
+  final String loanCategory;
   final double principalAmount;
   final double annualInterestRate;
   final int tenureMonths;
@@ -2469,6 +2722,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
   final double gstRateOnInterest;
   final String? expenseCategoryId;
   final String? defaultAccountId;
+  final String? disbursedAccountId;
+  final double processingFee;
+  final bool isProcessingFeePercentage;
+  final double? netDisbursedAmount;
   final bool autoLogExpense;
   final String status;
   final String? notes;
@@ -2477,6 +2734,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     required this.id,
     required this.productName,
     this.lenderName,
+    required this.loanCategory,
     required this.principalAmount,
     required this.annualInterestRate,
     required this.tenureMonths,
@@ -2485,6 +2743,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     required this.gstRateOnInterest,
     this.expenseCategoryId,
     this.defaultAccountId,
+    this.disbursedAccountId,
+    required this.processingFee,
+    required this.isProcessingFeePercentage,
+    this.netDisbursedAmount,
     required this.autoLogExpense,
     required this.status,
     this.notes,
@@ -2498,6 +2760,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     if (!nullToAbsent || lenderName != null) {
       map['lender_name'] = Variable<String>(lenderName);
     }
+    map['loan_category'] = Variable<String>(loanCategory);
     map['principal_amount'] = Variable<double>(principalAmount);
     map['annual_interest_rate'] = Variable<double>(annualInterestRate);
     map['tenure_months'] = Variable<int>(tenureMonths);
@@ -2509,6 +2772,16 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     }
     if (!nullToAbsent || defaultAccountId != null) {
       map['default_account_id'] = Variable<String>(defaultAccountId);
+    }
+    if (!nullToAbsent || disbursedAccountId != null) {
+      map['disbursed_account_id'] = Variable<String>(disbursedAccountId);
+    }
+    map['processing_fee'] = Variable<double>(processingFee);
+    map['is_processing_fee_percentage'] = Variable<bool>(
+      isProcessingFeePercentage,
+    );
+    if (!nullToAbsent || netDisbursedAmount != null) {
+      map['net_disbursed_amount'] = Variable<double>(netDisbursedAmount);
     }
     map['auto_log_expense'] = Variable<bool>(autoLogExpense);
     map['status'] = Variable<String>(status);
@@ -2526,6 +2799,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       lenderName: lenderName == null && nullToAbsent
           ? const Value.absent()
           : Value(lenderName),
+      loanCategory: Value(loanCategory),
       principalAmount: Value(principalAmount),
       annualInterestRate: Value(annualInterestRate),
       tenureMonths: Value(tenureMonths),
@@ -2538,6 +2812,14 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       defaultAccountId: defaultAccountId == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultAccountId),
+      disbursedAccountId: disbursedAccountId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(disbursedAccountId),
+      processingFee: Value(processingFee),
+      isProcessingFeePercentage: Value(isProcessingFeePercentage),
+      netDisbursedAmount: netDisbursedAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(netDisbursedAmount),
       autoLogExpense: Value(autoLogExpense),
       status: Value(status),
       notes: notes == null && nullToAbsent
@@ -2556,6 +2838,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       id: serializer.fromJson<String>(json['id']),
       productName: serializer.fromJson<String>(json['productName']),
       lenderName: serializer.fromJson<String?>(json['lenderName']),
+      loanCategory: serializer.fromJson<String>(json['loanCategory']),
       principalAmount: serializer.fromJson<double>(json['principalAmount']),
       annualInterestRate: serializer.fromJson<double>(
         json['annualInterestRate'],
@@ -2568,6 +2851,16 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
         json['expenseCategoryId'],
       ),
       defaultAccountId: serializer.fromJson<String?>(json['defaultAccountId']),
+      disbursedAccountId: serializer.fromJson<String?>(
+        json['disbursedAccountId'],
+      ),
+      processingFee: serializer.fromJson<double>(json['processingFee']),
+      isProcessingFeePercentage: serializer.fromJson<bool>(
+        json['isProcessingFeePercentage'],
+      ),
+      netDisbursedAmount: serializer.fromJson<double?>(
+        json['netDisbursedAmount'],
+      ),
       autoLogExpense: serializer.fromJson<bool>(json['autoLogExpense']),
       status: serializer.fromJson<String>(json['status']),
       notes: serializer.fromJson<String?>(json['notes']),
@@ -2581,6 +2874,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       'id': serializer.toJson<String>(id),
       'productName': serializer.toJson<String>(productName),
       'lenderName': serializer.toJson<String?>(lenderName),
+      'loanCategory': serializer.toJson<String>(loanCategory),
       'principalAmount': serializer.toJson<double>(principalAmount),
       'annualInterestRate': serializer.toJson<double>(annualInterestRate),
       'tenureMonths': serializer.toJson<int>(tenureMonths),
@@ -2589,6 +2883,12 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       'gstRateOnInterest': serializer.toJson<double>(gstRateOnInterest),
       'expenseCategoryId': serializer.toJson<String?>(expenseCategoryId),
       'defaultAccountId': serializer.toJson<String?>(defaultAccountId),
+      'disbursedAccountId': serializer.toJson<String?>(disbursedAccountId),
+      'processingFee': serializer.toJson<double>(processingFee),
+      'isProcessingFeePercentage': serializer.toJson<bool>(
+        isProcessingFeePercentage,
+      ),
+      'netDisbursedAmount': serializer.toJson<double?>(netDisbursedAmount),
       'autoLogExpense': serializer.toJson<bool>(autoLogExpense),
       'status': serializer.toJson<String>(status),
       'notes': serializer.toJson<String?>(notes),
@@ -2600,6 +2900,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     String? id,
     String? productName,
     Value<String?> lenderName = const Value.absent(),
+    String? loanCategory,
     double? principalAmount,
     double? annualInterestRate,
     int? tenureMonths,
@@ -2608,6 +2909,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     double? gstRateOnInterest,
     Value<String?> expenseCategoryId = const Value.absent(),
     Value<String?> defaultAccountId = const Value.absent(),
+    Value<String?> disbursedAccountId = const Value.absent(),
+    double? processingFee,
+    bool? isProcessingFeePercentage,
+    Value<double?> netDisbursedAmount = const Value.absent(),
     bool? autoLogExpense,
     String? status,
     Value<String?> notes = const Value.absent(),
@@ -2616,6 +2921,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     id: id ?? this.id,
     productName: productName ?? this.productName,
     lenderName: lenderName.present ? lenderName.value : this.lenderName,
+    loanCategory: loanCategory ?? this.loanCategory,
     principalAmount: principalAmount ?? this.principalAmount,
     annualInterestRate: annualInterestRate ?? this.annualInterestRate,
     tenureMonths: tenureMonths ?? this.tenureMonths,
@@ -2628,6 +2934,15 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     defaultAccountId: defaultAccountId.present
         ? defaultAccountId.value
         : this.defaultAccountId,
+    disbursedAccountId: disbursedAccountId.present
+        ? disbursedAccountId.value
+        : this.disbursedAccountId,
+    processingFee: processingFee ?? this.processingFee,
+    isProcessingFeePercentage:
+        isProcessingFeePercentage ?? this.isProcessingFeePercentage,
+    netDisbursedAmount: netDisbursedAmount.present
+        ? netDisbursedAmount.value
+        : this.netDisbursedAmount,
     autoLogExpense: autoLogExpense ?? this.autoLogExpense,
     status: status ?? this.status,
     notes: notes.present ? notes.value : this.notes,
@@ -2642,6 +2957,9 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       lenderName: data.lenderName.present
           ? data.lenderName.value
           : this.lenderName,
+      loanCategory: data.loanCategory.present
+          ? data.loanCategory.value
+          : this.loanCategory,
       principalAmount: data.principalAmount.present
           ? data.principalAmount.value
           : this.principalAmount,
@@ -2664,6 +2982,18 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
       defaultAccountId: data.defaultAccountId.present
           ? data.defaultAccountId.value
           : this.defaultAccountId,
+      disbursedAccountId: data.disbursedAccountId.present
+          ? data.disbursedAccountId.value
+          : this.disbursedAccountId,
+      processingFee: data.processingFee.present
+          ? data.processingFee.value
+          : this.processingFee,
+      isProcessingFeePercentage: data.isProcessingFeePercentage.present
+          ? data.isProcessingFeePercentage.value
+          : this.isProcessingFeePercentage,
+      netDisbursedAmount: data.netDisbursedAmount.present
+          ? data.netDisbursedAmount.value
+          : this.netDisbursedAmount,
       autoLogExpense: data.autoLogExpense.present
           ? data.autoLogExpense.value
           : this.autoLogExpense,
@@ -2679,6 +3009,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           ..write('id: $id, ')
           ..write('productName: $productName, ')
           ..write('lenderName: $lenderName, ')
+          ..write('loanCategory: $loanCategory, ')
           ..write('principalAmount: $principalAmount, ')
           ..write('annualInterestRate: $annualInterestRate, ')
           ..write('tenureMonths: $tenureMonths, ')
@@ -2687,6 +3018,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           ..write('gstRateOnInterest: $gstRateOnInterest, ')
           ..write('expenseCategoryId: $expenseCategoryId, ')
           ..write('defaultAccountId: $defaultAccountId, ')
+          ..write('disbursedAccountId: $disbursedAccountId, ')
+          ..write('processingFee: $processingFee, ')
+          ..write('isProcessingFeePercentage: $isProcessingFeePercentage, ')
+          ..write('netDisbursedAmount: $netDisbursedAmount, ')
           ..write('autoLogExpense: $autoLogExpense, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
@@ -2700,6 +3035,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     id,
     productName,
     lenderName,
+    loanCategory,
     principalAmount,
     annualInterestRate,
     tenureMonths,
@@ -2708,6 +3044,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
     gstRateOnInterest,
     expenseCategoryId,
     defaultAccountId,
+    disbursedAccountId,
+    processingFee,
+    isProcessingFeePercentage,
+    netDisbursedAmount,
     autoLogExpense,
     status,
     notes,
@@ -2720,6 +3060,7 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           other.id == this.id &&
           other.productName == this.productName &&
           other.lenderName == this.lenderName &&
+          other.loanCategory == this.loanCategory &&
           other.principalAmount == this.principalAmount &&
           other.annualInterestRate == this.annualInterestRate &&
           other.tenureMonths == this.tenureMonths &&
@@ -2728,6 +3069,10 @@ class EmiLoan extends DataClass implements Insertable<EmiLoan> {
           other.gstRateOnInterest == this.gstRateOnInterest &&
           other.expenseCategoryId == this.expenseCategoryId &&
           other.defaultAccountId == this.defaultAccountId &&
+          other.disbursedAccountId == this.disbursedAccountId &&
+          other.processingFee == this.processingFee &&
+          other.isProcessingFeePercentage == this.isProcessingFeePercentage &&
+          other.netDisbursedAmount == this.netDisbursedAmount &&
           other.autoLogExpense == this.autoLogExpense &&
           other.status == this.status &&
           other.notes == this.notes &&
@@ -2738,6 +3083,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
   final Value<String> id;
   final Value<String> productName;
   final Value<String?> lenderName;
+  final Value<String> loanCategory;
   final Value<double> principalAmount;
   final Value<double> annualInterestRate;
   final Value<int> tenureMonths;
@@ -2746,6 +3092,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
   final Value<double> gstRateOnInterest;
   final Value<String?> expenseCategoryId;
   final Value<String?> defaultAccountId;
+  final Value<String?> disbursedAccountId;
+  final Value<double> processingFee;
+  final Value<bool> isProcessingFeePercentage;
+  final Value<double?> netDisbursedAmount;
   final Value<bool> autoLogExpense;
   final Value<String> status;
   final Value<String?> notes;
@@ -2755,6 +3105,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     this.id = const Value.absent(),
     this.productName = const Value.absent(),
     this.lenderName = const Value.absent(),
+    this.loanCategory = const Value.absent(),
     this.principalAmount = const Value.absent(),
     this.annualInterestRate = const Value.absent(),
     this.tenureMonths = const Value.absent(),
@@ -2763,6 +3114,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     this.gstRateOnInterest = const Value.absent(),
     this.expenseCategoryId = const Value.absent(),
     this.defaultAccountId = const Value.absent(),
+    this.disbursedAccountId = const Value.absent(),
+    this.processingFee = const Value.absent(),
+    this.isProcessingFeePercentage = const Value.absent(),
+    this.netDisbursedAmount = const Value.absent(),
     this.autoLogExpense = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
@@ -2773,6 +3128,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     required String id,
     required String productName,
     this.lenderName = const Value.absent(),
+    this.loanCategory = const Value.absent(),
     required double principalAmount,
     required double annualInterestRate,
     required int tenureMonths,
@@ -2781,6 +3137,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     this.gstRateOnInterest = const Value.absent(),
     this.expenseCategoryId = const Value.absent(),
     this.defaultAccountId = const Value.absent(),
+    this.disbursedAccountId = const Value.absent(),
+    this.processingFee = const Value.absent(),
+    this.isProcessingFeePercentage = const Value.absent(),
+    this.netDisbursedAmount = const Value.absent(),
     this.autoLogExpense = const Value.absent(),
     this.status = const Value.absent(),
     this.notes = const Value.absent(),
@@ -2798,6 +3158,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Expression<String>? id,
     Expression<String>? productName,
     Expression<String>? lenderName,
+    Expression<String>? loanCategory,
     Expression<double>? principalAmount,
     Expression<double>? annualInterestRate,
     Expression<int>? tenureMonths,
@@ -2806,6 +3167,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Expression<double>? gstRateOnInterest,
     Expression<String>? expenseCategoryId,
     Expression<String>? defaultAccountId,
+    Expression<String>? disbursedAccountId,
+    Expression<double>? processingFee,
+    Expression<bool>? isProcessingFeePercentage,
+    Expression<double>? netDisbursedAmount,
     Expression<bool>? autoLogExpense,
     Expression<String>? status,
     Expression<String>? notes,
@@ -2816,6 +3181,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       if (id != null) 'id': id,
       if (productName != null) 'product_name': productName,
       if (lenderName != null) 'lender_name': lenderName,
+      if (loanCategory != null) 'loan_category': loanCategory,
       if (principalAmount != null) 'principal_amount': principalAmount,
       if (annualInterestRate != null)
         'annual_interest_rate': annualInterestRate,
@@ -2825,6 +3191,13 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       if (gstRateOnInterest != null) 'gst_rate_on_interest': gstRateOnInterest,
       if (expenseCategoryId != null) 'expense_category_id': expenseCategoryId,
       if (defaultAccountId != null) 'default_account_id': defaultAccountId,
+      if (disbursedAccountId != null)
+        'disbursed_account_id': disbursedAccountId,
+      if (processingFee != null) 'processing_fee': processingFee,
+      if (isProcessingFeePercentage != null)
+        'is_processing_fee_percentage': isProcessingFeePercentage,
+      if (netDisbursedAmount != null)
+        'net_disbursed_amount': netDisbursedAmount,
       if (autoLogExpense != null) 'auto_log_expense': autoLogExpense,
       if (status != null) 'status': status,
       if (notes != null) 'notes': notes,
@@ -2837,6 +3210,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Value<String>? id,
     Value<String>? productName,
     Value<String?>? lenderName,
+    Value<String>? loanCategory,
     Value<double>? principalAmount,
     Value<double>? annualInterestRate,
     Value<int>? tenureMonths,
@@ -2845,6 +3219,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     Value<double>? gstRateOnInterest,
     Value<String?>? expenseCategoryId,
     Value<String?>? defaultAccountId,
+    Value<String?>? disbursedAccountId,
+    Value<double>? processingFee,
+    Value<bool>? isProcessingFeePercentage,
+    Value<double?>? netDisbursedAmount,
     Value<bool>? autoLogExpense,
     Value<String>? status,
     Value<String?>? notes,
@@ -2855,6 +3233,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       id: id ?? this.id,
       productName: productName ?? this.productName,
       lenderName: lenderName ?? this.lenderName,
+      loanCategory: loanCategory ?? this.loanCategory,
       principalAmount: principalAmount ?? this.principalAmount,
       annualInterestRate: annualInterestRate ?? this.annualInterestRate,
       tenureMonths: tenureMonths ?? this.tenureMonths,
@@ -2863,6 +3242,11 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
       gstRateOnInterest: gstRateOnInterest ?? this.gstRateOnInterest,
       expenseCategoryId: expenseCategoryId ?? this.expenseCategoryId,
       defaultAccountId: defaultAccountId ?? this.defaultAccountId,
+      disbursedAccountId: disbursedAccountId ?? this.disbursedAccountId,
+      processingFee: processingFee ?? this.processingFee,
+      isProcessingFeePercentage:
+          isProcessingFeePercentage ?? this.isProcessingFeePercentage,
+      netDisbursedAmount: netDisbursedAmount ?? this.netDisbursedAmount,
       autoLogExpense: autoLogExpense ?? this.autoLogExpense,
       status: status ?? this.status,
       notes: notes ?? this.notes,
@@ -2882,6 +3266,9 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     }
     if (lenderName.present) {
       map['lender_name'] = Variable<String>(lenderName.value);
+    }
+    if (loanCategory.present) {
+      map['loan_category'] = Variable<String>(loanCategory.value);
     }
     if (principalAmount.present) {
       map['principal_amount'] = Variable<double>(principalAmount.value);
@@ -2907,6 +3294,20 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
     if (defaultAccountId.present) {
       map['default_account_id'] = Variable<String>(defaultAccountId.value);
     }
+    if (disbursedAccountId.present) {
+      map['disbursed_account_id'] = Variable<String>(disbursedAccountId.value);
+    }
+    if (processingFee.present) {
+      map['processing_fee'] = Variable<double>(processingFee.value);
+    }
+    if (isProcessingFeePercentage.present) {
+      map['is_processing_fee_percentage'] = Variable<bool>(
+        isProcessingFeePercentage.value,
+      );
+    }
+    if (netDisbursedAmount.present) {
+      map['net_disbursed_amount'] = Variable<double>(netDisbursedAmount.value);
+    }
     if (autoLogExpense.present) {
       map['auto_log_expense'] = Variable<bool>(autoLogExpense.value);
     }
@@ -2931,6 +3332,7 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
           ..write('id: $id, ')
           ..write('productName: $productName, ')
           ..write('lenderName: $lenderName, ')
+          ..write('loanCategory: $loanCategory, ')
           ..write('principalAmount: $principalAmount, ')
           ..write('annualInterestRate: $annualInterestRate, ')
           ..write('tenureMonths: $tenureMonths, ')
@@ -2939,6 +3341,10 @@ class EmiLoansCompanion extends UpdateCompanion<EmiLoan> {
           ..write('gstRateOnInterest: $gstRateOnInterest, ')
           ..write('expenseCategoryId: $expenseCategoryId, ')
           ..write('defaultAccountId: $defaultAccountId, ')
+          ..write('disbursedAccountId: $disbursedAccountId, ')
+          ..write('processingFee: $processingFee, ')
+          ..write('isProcessingFeePercentage: $isProcessingFeePercentage, ')
+          ..write('netDisbursedAmount: $netDisbursedAmount, ')
           ..write('autoLogExpense: $autoLogExpense, ')
           ..write('status: $status, ')
           ..write('notes: $notes, ')
@@ -3580,6 +3986,760 @@ class EmiPaymentsCompanion extends UpdateCompanion<EmiPayment> {
           ..write('totalAmountPaid: $totalAmountPaid, ')
           ..write('isPrepayment: $isPrepayment, ')
           ..write('notes: $notes, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LoanComparisonsTable extends LoanComparisons
+    with TableInfo<$LoanComparisonsTable, LoanComparison> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LoanComparisonsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _groupNameMeta = const VerificationMeta(
+    'groupName',
+  );
+  @override
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+    'group_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('General Comparison'),
+  );
+  static const VerificationMeta _lenderNameMeta = const VerificationMeta(
+    'lenderName',
+  );
+  @override
+  late final GeneratedColumn<String> lenderName = GeneratedColumn<String>(
+    'lender_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _loanCategoryMeta = const VerificationMeta(
+    'loanCategory',
+  );
+  @override
+  late final GeneratedColumn<String> loanCategory = GeneratedColumn<String>(
+    'loan_category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('personal_bank'),
+  );
+  static const VerificationMeta _principalAmountMeta = const VerificationMeta(
+    'principalAmount',
+  );
+  @override
+  late final GeneratedColumn<double> principalAmount = GeneratedColumn<double>(
+    'principal_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _annualInterestRateMeta =
+      const VerificationMeta('annualInterestRate');
+  @override
+  late final GeneratedColumn<double> annualInterestRate =
+      GeneratedColumn<double>(
+        'annual_interest_rate',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _tenureMonthsMeta = const VerificationMeta(
+    'tenureMonths',
+  );
+  @override
+  late final GeneratedColumn<int> tenureMonths = GeneratedColumn<int>(
+    'tenure_months',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _processingFeeMeta = const VerificationMeta(
+    'processingFee',
+  );
+  @override
+  late final GeneratedColumn<double> processingFee = GeneratedColumn<double>(
+    'processing_fee',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _isProcessingFeePercentageMeta =
+      const VerificationMeta('isProcessingFeePercentage');
+  @override
+  late final GeneratedColumn<bool> isProcessingFeePercentage =
+      GeneratedColumn<bool>(
+        'is_processing_fee_percentage',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_processing_fee_percentage" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _gstRateOnFeesMeta = const VerificationMeta(
+    'gstRateOnFees',
+  );
+  @override
+  late final GeneratedColumn<double> gstRateOnFees = GeneratedColumn<double>(
+    'gst_rate_on_fees',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(18.0),
+  );
+  static const VerificationMeta _isFinalizedMeta = const VerificationMeta(
+    'isFinalized',
+  );
+  @override
+  late final GeneratedColumn<bool> isFinalized = GeneratedColumn<bool>(
+    'is_finalized',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_finalized" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    groupName,
+    lenderName,
+    loanCategory,
+    principalAmount,
+    annualInterestRate,
+    tenureMonths,
+    processingFee,
+    isProcessingFeePercentage,
+    gstRateOnFees,
+    isFinalized,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'loan_comparisons';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LoanComparison> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('group_name')) {
+      context.handle(
+        _groupNameMeta,
+        groupName.isAcceptableOrUnknown(data['group_name']!, _groupNameMeta),
+      );
+    }
+    if (data.containsKey('lender_name')) {
+      context.handle(
+        _lenderNameMeta,
+        lenderName.isAcceptableOrUnknown(data['lender_name']!, _lenderNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lenderNameMeta);
+    }
+    if (data.containsKey('loan_category')) {
+      context.handle(
+        _loanCategoryMeta,
+        loanCategory.isAcceptableOrUnknown(
+          data['loan_category']!,
+          _loanCategoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('principal_amount')) {
+      context.handle(
+        _principalAmountMeta,
+        principalAmount.isAcceptableOrUnknown(
+          data['principal_amount']!,
+          _principalAmountMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_principalAmountMeta);
+    }
+    if (data.containsKey('annual_interest_rate')) {
+      context.handle(
+        _annualInterestRateMeta,
+        annualInterestRate.isAcceptableOrUnknown(
+          data['annual_interest_rate']!,
+          _annualInterestRateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_annualInterestRateMeta);
+    }
+    if (data.containsKey('tenure_months')) {
+      context.handle(
+        _tenureMonthsMeta,
+        tenureMonths.isAcceptableOrUnknown(
+          data['tenure_months']!,
+          _tenureMonthsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_tenureMonthsMeta);
+    }
+    if (data.containsKey('processing_fee')) {
+      context.handle(
+        _processingFeeMeta,
+        processingFee.isAcceptableOrUnknown(
+          data['processing_fee']!,
+          _processingFeeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_processing_fee_percentage')) {
+      context.handle(
+        _isProcessingFeePercentageMeta,
+        isProcessingFeePercentage.isAcceptableOrUnknown(
+          data['is_processing_fee_percentage']!,
+          _isProcessingFeePercentageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('gst_rate_on_fees')) {
+      context.handle(
+        _gstRateOnFeesMeta,
+        gstRateOnFees.isAcceptableOrUnknown(
+          data['gst_rate_on_fees']!,
+          _gstRateOnFeesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_finalized')) {
+      context.handle(
+        _isFinalizedMeta,
+        isFinalized.isAcceptableOrUnknown(
+          data['is_finalized']!,
+          _isFinalizedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LoanComparison map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LoanComparison(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      groupName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_name'],
+      )!,
+      lenderName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lender_name'],
+      )!,
+      loanCategory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}loan_category'],
+      )!,
+      principalAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}principal_amount'],
+      )!,
+      annualInterestRate: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}annual_interest_rate'],
+      )!,
+      tenureMonths: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tenure_months'],
+      )!,
+      processingFee: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}processing_fee'],
+      )!,
+      isProcessingFeePercentage: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_processing_fee_percentage'],
+      )!,
+      gstRateOnFees: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}gst_rate_on_fees'],
+      )!,
+      isFinalized: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_finalized'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $LoanComparisonsTable createAlias(String alias) {
+    return $LoanComparisonsTable(attachedDatabase, alias);
+  }
+}
+
+class LoanComparison extends DataClass implements Insertable<LoanComparison> {
+  final String id;
+  final String groupName;
+  final String lenderName;
+  final String loanCategory;
+  final double principalAmount;
+  final double annualInterestRate;
+  final int tenureMonths;
+  final double processingFee;
+  final bool isProcessingFeePercentage;
+  final double gstRateOnFees;
+  final bool isFinalized;
+  final DateTime createdAt;
+  const LoanComparison({
+    required this.id,
+    required this.groupName,
+    required this.lenderName,
+    required this.loanCategory,
+    required this.principalAmount,
+    required this.annualInterestRate,
+    required this.tenureMonths,
+    required this.processingFee,
+    required this.isProcessingFeePercentage,
+    required this.gstRateOnFees,
+    required this.isFinalized,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['group_name'] = Variable<String>(groupName);
+    map['lender_name'] = Variable<String>(lenderName);
+    map['loan_category'] = Variable<String>(loanCategory);
+    map['principal_amount'] = Variable<double>(principalAmount);
+    map['annual_interest_rate'] = Variable<double>(annualInterestRate);
+    map['tenure_months'] = Variable<int>(tenureMonths);
+    map['processing_fee'] = Variable<double>(processingFee);
+    map['is_processing_fee_percentage'] = Variable<bool>(
+      isProcessingFeePercentage,
+    );
+    map['gst_rate_on_fees'] = Variable<double>(gstRateOnFees);
+    map['is_finalized'] = Variable<bool>(isFinalized);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  LoanComparisonsCompanion toCompanion(bool nullToAbsent) {
+    return LoanComparisonsCompanion(
+      id: Value(id),
+      groupName: Value(groupName),
+      lenderName: Value(lenderName),
+      loanCategory: Value(loanCategory),
+      principalAmount: Value(principalAmount),
+      annualInterestRate: Value(annualInterestRate),
+      tenureMonths: Value(tenureMonths),
+      processingFee: Value(processingFee),
+      isProcessingFeePercentage: Value(isProcessingFeePercentage),
+      gstRateOnFees: Value(gstRateOnFees),
+      isFinalized: Value(isFinalized),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LoanComparison.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LoanComparison(
+      id: serializer.fromJson<String>(json['id']),
+      groupName: serializer.fromJson<String>(json['groupName']),
+      lenderName: serializer.fromJson<String>(json['lenderName']),
+      loanCategory: serializer.fromJson<String>(json['loanCategory']),
+      principalAmount: serializer.fromJson<double>(json['principalAmount']),
+      annualInterestRate: serializer.fromJson<double>(
+        json['annualInterestRate'],
+      ),
+      tenureMonths: serializer.fromJson<int>(json['tenureMonths']),
+      processingFee: serializer.fromJson<double>(json['processingFee']),
+      isProcessingFeePercentage: serializer.fromJson<bool>(
+        json['isProcessingFeePercentage'],
+      ),
+      gstRateOnFees: serializer.fromJson<double>(json['gstRateOnFees']),
+      isFinalized: serializer.fromJson<bool>(json['isFinalized']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'groupName': serializer.toJson<String>(groupName),
+      'lenderName': serializer.toJson<String>(lenderName),
+      'loanCategory': serializer.toJson<String>(loanCategory),
+      'principalAmount': serializer.toJson<double>(principalAmount),
+      'annualInterestRate': serializer.toJson<double>(annualInterestRate),
+      'tenureMonths': serializer.toJson<int>(tenureMonths),
+      'processingFee': serializer.toJson<double>(processingFee),
+      'isProcessingFeePercentage': serializer.toJson<bool>(
+        isProcessingFeePercentage,
+      ),
+      'gstRateOnFees': serializer.toJson<double>(gstRateOnFees),
+      'isFinalized': serializer.toJson<bool>(isFinalized),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LoanComparison copyWith({
+    String? id,
+    String? groupName,
+    String? lenderName,
+    String? loanCategory,
+    double? principalAmount,
+    double? annualInterestRate,
+    int? tenureMonths,
+    double? processingFee,
+    bool? isProcessingFeePercentage,
+    double? gstRateOnFees,
+    bool? isFinalized,
+    DateTime? createdAt,
+  }) => LoanComparison(
+    id: id ?? this.id,
+    groupName: groupName ?? this.groupName,
+    lenderName: lenderName ?? this.lenderName,
+    loanCategory: loanCategory ?? this.loanCategory,
+    principalAmount: principalAmount ?? this.principalAmount,
+    annualInterestRate: annualInterestRate ?? this.annualInterestRate,
+    tenureMonths: tenureMonths ?? this.tenureMonths,
+    processingFee: processingFee ?? this.processingFee,
+    isProcessingFeePercentage:
+        isProcessingFeePercentage ?? this.isProcessingFeePercentage,
+    gstRateOnFees: gstRateOnFees ?? this.gstRateOnFees,
+    isFinalized: isFinalized ?? this.isFinalized,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  LoanComparison copyWithCompanion(LoanComparisonsCompanion data) {
+    return LoanComparison(
+      id: data.id.present ? data.id.value : this.id,
+      groupName: data.groupName.present ? data.groupName.value : this.groupName,
+      lenderName: data.lenderName.present
+          ? data.lenderName.value
+          : this.lenderName,
+      loanCategory: data.loanCategory.present
+          ? data.loanCategory.value
+          : this.loanCategory,
+      principalAmount: data.principalAmount.present
+          ? data.principalAmount.value
+          : this.principalAmount,
+      annualInterestRate: data.annualInterestRate.present
+          ? data.annualInterestRate.value
+          : this.annualInterestRate,
+      tenureMonths: data.tenureMonths.present
+          ? data.tenureMonths.value
+          : this.tenureMonths,
+      processingFee: data.processingFee.present
+          ? data.processingFee.value
+          : this.processingFee,
+      isProcessingFeePercentage: data.isProcessingFeePercentage.present
+          ? data.isProcessingFeePercentage.value
+          : this.isProcessingFeePercentage,
+      gstRateOnFees: data.gstRateOnFees.present
+          ? data.gstRateOnFees.value
+          : this.gstRateOnFees,
+      isFinalized: data.isFinalized.present
+          ? data.isFinalized.value
+          : this.isFinalized,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LoanComparison(')
+          ..write('id: $id, ')
+          ..write('groupName: $groupName, ')
+          ..write('lenderName: $lenderName, ')
+          ..write('loanCategory: $loanCategory, ')
+          ..write('principalAmount: $principalAmount, ')
+          ..write('annualInterestRate: $annualInterestRate, ')
+          ..write('tenureMonths: $tenureMonths, ')
+          ..write('processingFee: $processingFee, ')
+          ..write('isProcessingFeePercentage: $isProcessingFeePercentage, ')
+          ..write('gstRateOnFees: $gstRateOnFees, ')
+          ..write('isFinalized: $isFinalized, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    groupName,
+    lenderName,
+    loanCategory,
+    principalAmount,
+    annualInterestRate,
+    tenureMonths,
+    processingFee,
+    isProcessingFeePercentage,
+    gstRateOnFees,
+    isFinalized,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LoanComparison &&
+          other.id == this.id &&
+          other.groupName == this.groupName &&
+          other.lenderName == this.lenderName &&
+          other.loanCategory == this.loanCategory &&
+          other.principalAmount == this.principalAmount &&
+          other.annualInterestRate == this.annualInterestRate &&
+          other.tenureMonths == this.tenureMonths &&
+          other.processingFee == this.processingFee &&
+          other.isProcessingFeePercentage == this.isProcessingFeePercentage &&
+          other.gstRateOnFees == this.gstRateOnFees &&
+          other.isFinalized == this.isFinalized &&
+          other.createdAt == this.createdAt);
+}
+
+class LoanComparisonsCompanion extends UpdateCompanion<LoanComparison> {
+  final Value<String> id;
+  final Value<String> groupName;
+  final Value<String> lenderName;
+  final Value<String> loanCategory;
+  final Value<double> principalAmount;
+  final Value<double> annualInterestRate;
+  final Value<int> tenureMonths;
+  final Value<double> processingFee;
+  final Value<bool> isProcessingFeePercentage;
+  final Value<double> gstRateOnFees;
+  final Value<bool> isFinalized;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const LoanComparisonsCompanion({
+    this.id = const Value.absent(),
+    this.groupName = const Value.absent(),
+    this.lenderName = const Value.absent(),
+    this.loanCategory = const Value.absent(),
+    this.principalAmount = const Value.absent(),
+    this.annualInterestRate = const Value.absent(),
+    this.tenureMonths = const Value.absent(),
+    this.processingFee = const Value.absent(),
+    this.isProcessingFeePercentage = const Value.absent(),
+    this.gstRateOnFees = const Value.absent(),
+    this.isFinalized = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LoanComparisonsCompanion.insert({
+    required String id,
+    this.groupName = const Value.absent(),
+    required String lenderName,
+    this.loanCategory = const Value.absent(),
+    required double principalAmount,
+    required double annualInterestRate,
+    required int tenureMonths,
+    this.processingFee = const Value.absent(),
+    this.isProcessingFeePercentage = const Value.absent(),
+    this.gstRateOnFees = const Value.absent(),
+    this.isFinalized = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       lenderName = Value(lenderName),
+       principalAmount = Value(principalAmount),
+       annualInterestRate = Value(annualInterestRate),
+       tenureMonths = Value(tenureMonths),
+       createdAt = Value(createdAt);
+  static Insertable<LoanComparison> custom({
+    Expression<String>? id,
+    Expression<String>? groupName,
+    Expression<String>? lenderName,
+    Expression<String>? loanCategory,
+    Expression<double>? principalAmount,
+    Expression<double>? annualInterestRate,
+    Expression<int>? tenureMonths,
+    Expression<double>? processingFee,
+    Expression<bool>? isProcessingFeePercentage,
+    Expression<double>? gstRateOnFees,
+    Expression<bool>? isFinalized,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (groupName != null) 'group_name': groupName,
+      if (lenderName != null) 'lender_name': lenderName,
+      if (loanCategory != null) 'loan_category': loanCategory,
+      if (principalAmount != null) 'principal_amount': principalAmount,
+      if (annualInterestRate != null)
+        'annual_interest_rate': annualInterestRate,
+      if (tenureMonths != null) 'tenure_months': tenureMonths,
+      if (processingFee != null) 'processing_fee': processingFee,
+      if (isProcessingFeePercentage != null)
+        'is_processing_fee_percentage': isProcessingFeePercentage,
+      if (gstRateOnFees != null) 'gst_rate_on_fees': gstRateOnFees,
+      if (isFinalized != null) 'is_finalized': isFinalized,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LoanComparisonsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? groupName,
+    Value<String>? lenderName,
+    Value<String>? loanCategory,
+    Value<double>? principalAmount,
+    Value<double>? annualInterestRate,
+    Value<int>? tenureMonths,
+    Value<double>? processingFee,
+    Value<bool>? isProcessingFeePercentage,
+    Value<double>? gstRateOnFees,
+    Value<bool>? isFinalized,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return LoanComparisonsCompanion(
+      id: id ?? this.id,
+      groupName: groupName ?? this.groupName,
+      lenderName: lenderName ?? this.lenderName,
+      loanCategory: loanCategory ?? this.loanCategory,
+      principalAmount: principalAmount ?? this.principalAmount,
+      annualInterestRate: annualInterestRate ?? this.annualInterestRate,
+      tenureMonths: tenureMonths ?? this.tenureMonths,
+      processingFee: processingFee ?? this.processingFee,
+      isProcessingFeePercentage:
+          isProcessingFeePercentage ?? this.isProcessingFeePercentage,
+      gstRateOnFees: gstRateOnFees ?? this.gstRateOnFees,
+      isFinalized: isFinalized ?? this.isFinalized,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (groupName.present) {
+      map['group_name'] = Variable<String>(groupName.value);
+    }
+    if (lenderName.present) {
+      map['lender_name'] = Variable<String>(lenderName.value);
+    }
+    if (loanCategory.present) {
+      map['loan_category'] = Variable<String>(loanCategory.value);
+    }
+    if (principalAmount.present) {
+      map['principal_amount'] = Variable<double>(principalAmount.value);
+    }
+    if (annualInterestRate.present) {
+      map['annual_interest_rate'] = Variable<double>(annualInterestRate.value);
+    }
+    if (tenureMonths.present) {
+      map['tenure_months'] = Variable<int>(tenureMonths.value);
+    }
+    if (processingFee.present) {
+      map['processing_fee'] = Variable<double>(processingFee.value);
+    }
+    if (isProcessingFeePercentage.present) {
+      map['is_processing_fee_percentage'] = Variable<bool>(
+        isProcessingFeePercentage.value,
+      );
+    }
+    if (gstRateOnFees.present) {
+      map['gst_rate_on_fees'] = Variable<double>(gstRateOnFees.value);
+    }
+    if (isFinalized.present) {
+      map['is_finalized'] = Variable<bool>(isFinalized.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LoanComparisonsCompanion(')
+          ..write('id: $id, ')
+          ..write('groupName: $groupName, ')
+          ..write('lenderName: $lenderName, ')
+          ..write('loanCategory: $loanCategory, ')
+          ..write('principalAmount: $principalAmount, ')
+          ..write('annualInterestRate: $annualInterestRate, ')
+          ..write('tenureMonths: $tenureMonths, ')
+          ..write('processingFee: $processingFee, ')
+          ..write('isProcessingFeePercentage: $isProcessingFeePercentage, ')
+          ..write('gstRateOnFees: $gstRateOnFees, ')
+          ..write('isFinalized: $isFinalized, ')
+          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5602,6 +6762,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $BudgetsTable budgets = $BudgetsTable(this);
   late final $EmiLoansTable emiLoans = $EmiLoansTable(this);
   late final $EmiPaymentsTable emiPayments = $EmiPaymentsTable(this);
+  late final $LoanComparisonsTable loanComparisons = $LoanComparisonsTable(
+    this,
+  );
   late final $InvestmentsTable investments = $InvestmentsTable(this);
   late final $ChittyInstallmentsTable chittyInstallments =
       $ChittyInstallmentsTable(this);
@@ -5617,12 +6780,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     budgets,
     emiLoans,
     emiPayments,
+    loanComparisons,
     investments,
     chittyInstallments,
     reminders,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'accounts',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('accounts', kind: UpdateKind.update)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'accounts',
@@ -5647,6 +6818,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'categories',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('emi_loans', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'accounts',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('emi_loans', kind: UpdateKind.update)],
@@ -6221,6 +7399,8 @@ typedef $$AccountsTableCreateCompanionBuilder =
       required String accountType,
       Value<double> currentBalance,
       Value<double?> creditLimit,
+      Value<String?> defaultPayFromAccountId,
+      Value<bool> isActive,
       required int iconCode,
       required int colorValue,
       Value<int> rowid,
@@ -6232,6 +7412,8 @@ typedef $$AccountsTableUpdateCompanionBuilder =
       Value<String> accountType,
       Value<double> currentBalance,
       Value<double?> creditLimit,
+      Value<String?> defaultPayFromAccountId,
+      Value<bool> isActive,
       Value<int> iconCode,
       Value<int> colorValue,
       Value<int> rowid,
@@ -6241,21 +7423,23 @@ final class $$AccountsTableReferences
     extends BaseReferences<_$AppDatabase, $AccountsTable, Account> {
   $$AccountsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$EmiLoansTable, List<EmiLoan>> _emiLoansRefsTable(
-    _$AppDatabase db,
-  ) => MultiTypedResultKey.fromTable(
-    db.emiLoans,
-    aliasName: 'accounts__id__emi_loans__default_account_id',
-  );
+  static $AccountsTable _defaultPayFromAccountIdTable(_$AppDatabase db) => db
+      .accounts
+      .createAlias('accounts__default_pay_from_account_id__accounts__id');
 
-  $$EmiLoansTableProcessedTableManager get emiLoansRefs {
-    final manager = $$EmiLoansTableTableManager($_db, $_db.emiLoans).filter(
-      (f) => f.defaultAccountId.id.sqlEquals($_itemColumn<String>('id')!),
+  $$AccountsTableProcessedTableManager? get defaultPayFromAccountId {
+    final $_column = $_itemColumn<String>('default_pay_from_account_id');
+    if ($_column == null) return null;
+    final manager = $$AccountsTableTableManager(
+      $_db,
+      $_db.accounts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(
+      _defaultPayFromAccountIdTable($_db),
     );
-
-    final cache = $_typedResult.readTableOrNull(_emiLoansRefsTable($_db));
+    if (item == null) return manager;
     return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
+      manager.$state.copyWith(prefetchedData: [item]),
     );
   }
 }
@@ -6294,6 +7478,11 @@ class $$AccountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get iconCode => $composableBuilder(
     column: $table.iconCode,
     builder: (column) => ColumnFilters(column),
@@ -6304,29 +7493,27 @@ class $$AccountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  Expression<bool> emiLoansRefs(
-    Expression<bool> Function($$EmiLoansTableFilterComposer f) f,
-  ) {
-    final $$EmiLoansTableFilterComposer composer = $composerBuilder(
+  $$AccountsTableFilterComposer get defaultPayFromAccountId {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.emiLoans,
-      getReferencedColumn: (t) => t.defaultAccountId,
+      getCurrentColumn: (t) => t.defaultPayFromAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$EmiLoansTableFilterComposer(
+          }) => $$AccountsTableFilterComposer(
             $db: $db,
-            $table: $db.emiLoans,
+            $table: $db.accounts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
                 $removeJoinBuilderFromRootComposer,
           ),
     );
-    return f(composer);
+    return composer;
   }
 }
 
@@ -6364,6 +7551,11 @@ class $$AccountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get iconCode => $composableBuilder(
     column: $table.iconCode,
     builder: (column) => ColumnOrderings(column),
@@ -6373,6 +7565,29 @@ class $$AccountsTableOrderingComposer
     column: $table.colorValue,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$AccountsTableOrderingComposer get defaultPayFromAccountId {
+    final $$AccountsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.defaultPayFromAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableOrderingComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$AccountsTableAnnotationComposer
@@ -6405,6 +7620,9 @@ class $$AccountsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
   GeneratedColumn<int> get iconCode =>
       $composableBuilder(column: $table.iconCode, builder: (column) => column);
 
@@ -6413,29 +7631,27 @@ class $$AccountsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  Expression<T> emiLoansRefs<T extends Object>(
-    Expression<T> Function($$EmiLoansTableAnnotationComposer a) f,
-  ) {
-    final $$EmiLoansTableAnnotationComposer composer = $composerBuilder(
+  $$AccountsTableAnnotationComposer get defaultPayFromAccountId {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.emiLoans,
-      getReferencedColumn: (t) => t.defaultAccountId,
+      getCurrentColumn: (t) => t.defaultPayFromAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$EmiLoansTableAnnotationComposer(
+          }) => $$AccountsTableAnnotationComposer(
             $db: $db,
-            $table: $db.emiLoans,
+            $table: $db.accounts,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
                 $removeJoinBuilderFromRootComposer,
           ),
     );
-    return f(composer);
+    return composer;
   }
 }
 
@@ -6452,7 +7668,7 @@ class $$AccountsTableTableManager
           $$AccountsTableUpdateCompanionBuilder,
           (Account, $$AccountsTableReferences),
           Account,
-          PrefetchHooks Function({bool emiLoansRefs})
+          PrefetchHooks Function({bool defaultPayFromAccountId})
         > {
   $$AccountsTableTableManager(_$AppDatabase db, $AccountsTable table)
     : super(
@@ -6472,6 +7688,8 @@ class $$AccountsTableTableManager
                 Value<String> accountType = const Value.absent(),
                 Value<double> currentBalance = const Value.absent(),
                 Value<double?> creditLimit = const Value.absent(),
+                Value<String?> defaultPayFromAccountId = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 Value<int> iconCode = const Value.absent(),
                 Value<int> colorValue = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -6481,6 +7699,8 @@ class $$AccountsTableTableManager
                 accountType: accountType,
                 currentBalance: currentBalance,
                 creditLimit: creditLimit,
+                defaultPayFromAccountId: defaultPayFromAccountId,
+                isActive: isActive,
                 iconCode: iconCode,
                 colorValue: colorValue,
                 rowid: rowid,
@@ -6492,6 +7712,8 @@ class $$AccountsTableTableManager
                 required String accountType,
                 Value<double> currentBalance = const Value.absent(),
                 Value<double?> creditLimit = const Value.absent(),
+                Value<String?> defaultPayFromAccountId = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
                 required int iconCode,
                 required int colorValue,
                 Value<int> rowid = const Value.absent(),
@@ -6501,6 +7723,8 @@ class $$AccountsTableTableManager
                 accountType: accountType,
                 currentBalance: currentBalance,
                 creditLimit: creditLimit,
+                defaultPayFromAccountId: defaultPayFromAccountId,
+                isActive: isActive,
                 iconCode: iconCode,
                 colorValue: colorValue,
                 rowid: rowid,
@@ -6513,27 +7737,44 @@ class $$AccountsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({emiLoansRefs = false}) {
+          prefetchHooksCallback: ({defaultPayFromAccountId = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (emiLoansRefs) db.emiLoans],
-              addJoins: null,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (defaultPayFromAccountId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.defaultPayFromAccountId,
+                                referencedTable: $$AccountsTableReferences
+                                    ._defaultPayFromAccountIdTable(db),
+                                referencedColumn: $$AccountsTableReferences
+                                    ._defaultPayFromAccountIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
-                return [
-                  if (emiLoansRefs)
-                    await $_getPrefetchedData<Account, $AccountsTable, EmiLoan>(
-                      currentTable: table,
-                      referencedTable: $$AccountsTableReferences
-                          ._emiLoansRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$AccountsTableReferences(db, table, p0).emiLoansRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where(
-                            (e) => e.defaultAccountId == item.id,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+                return [];
               },
             );
           },
@@ -6553,7 +7794,7 @@ typedef $$AccountsTableProcessedTableManager =
       $$AccountsTableUpdateCompanionBuilder,
       (Account, $$AccountsTableReferences),
       Account,
-      PrefetchHooks Function({bool emiLoansRefs})
+      PrefetchHooks Function({bool defaultPayFromAccountId})
     >;
 typedef $$TransactionsTableCreateCompanionBuilder =
     TransactionsCompanion Function({
@@ -7524,6 +8765,7 @@ typedef $$EmiLoansTableCreateCompanionBuilder =
       required String id,
       required String productName,
       Value<String?> lenderName,
+      Value<String> loanCategory,
       required double principalAmount,
       required double annualInterestRate,
       required int tenureMonths,
@@ -7532,6 +8774,10 @@ typedef $$EmiLoansTableCreateCompanionBuilder =
       Value<double> gstRateOnInterest,
       Value<String?> expenseCategoryId,
       Value<String?> defaultAccountId,
+      Value<String?> disbursedAccountId,
+      Value<double> processingFee,
+      Value<bool> isProcessingFeePercentage,
+      Value<double?> netDisbursedAmount,
       Value<bool> autoLogExpense,
       Value<String> status,
       Value<String?> notes,
@@ -7543,6 +8789,7 @@ typedef $$EmiLoansTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> productName,
       Value<String?> lenderName,
+      Value<String> loanCategory,
       Value<double> principalAmount,
       Value<double> annualInterestRate,
       Value<int> tenureMonths,
@@ -7551,6 +8798,10 @@ typedef $$EmiLoansTableUpdateCompanionBuilder =
       Value<double> gstRateOnInterest,
       Value<String?> expenseCategoryId,
       Value<String?> defaultAccountId,
+      Value<String?> disbursedAccountId,
+      Value<double> processingFee,
+      Value<bool> isProcessingFeePercentage,
+      Value<double?> netDisbursedAmount,
       Value<bool> autoLogExpense,
       Value<String> status,
       Value<String?> notes,
@@ -7591,6 +8842,23 @@ final class $$EmiLoansTableReferences
       $_db.accounts,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_defaultAccountIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $AccountsTable _disbursedAccountIdTable(_$AppDatabase db) =>
+      db.accounts.createAlias('emi_loans__disbursed_account_id__accounts__id');
+
+  $$AccountsTableProcessedTableManager? get disbursedAccountId {
+    final $_column = $_itemColumn<String>('disbursed_account_id');
+    if ($_column == null) return null;
+    final manager = $$AccountsTableTableManager(
+      $_db,
+      $_db.accounts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_disbursedAccountIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -7640,6 +8908,11 @@ class $$EmiLoansTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get principalAmount => $composableBuilder(
     column: $table.principalAmount,
     builder: (column) => ColumnFilters(column),
@@ -7667,6 +8940,21 @@ class $$EmiLoansTableFilterComposer
 
   ColumnFilters<double> get gstRateOnInterest => $composableBuilder(
     column: $table.gstRateOnInterest,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get netDisbursedAmount => $composableBuilder(
+    column: $table.netDisbursedAmount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7736,6 +9024,29 @@ class $$EmiLoansTableFilterComposer
     return composer;
   }
 
+  $$AccountsTableFilterComposer get disbursedAccountId {
+    final $$AccountsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.disbursedAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableFilterComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<bool> emiPaymentsRefs(
     Expression<bool> Function($$EmiPaymentsTableFilterComposer f) f,
   ) {
@@ -7786,6 +9097,11 @@ class $$EmiLoansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get principalAmount => $composableBuilder(
     column: $table.principalAmount,
     builder: (column) => ColumnOrderings(column),
@@ -7813,6 +9129,21 @@ class $$EmiLoansTableOrderingComposer
 
   ColumnOrderings<double> get gstRateOnInterest => $composableBuilder(
     column: $table.gstRateOnInterest,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get netDisbursedAmount => $composableBuilder(
+    column: $table.netDisbursedAmount,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7881,6 +9212,29 @@ class $$EmiLoansTableOrderingComposer
     );
     return composer;
   }
+
+  $$AccountsTableOrderingComposer get disbursedAccountId {
+    final $$AccountsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.disbursedAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableOrderingComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$EmiLoansTableAnnotationComposer
@@ -7902,6 +9256,11 @@ class $$EmiLoansTableAnnotationComposer
 
   GeneratedColumn<String> get lenderName => $composableBuilder(
     column: $table.lenderName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
     builder: (column) => column,
   );
 
@@ -7930,6 +9289,21 @@ class $$EmiLoansTableAnnotationComposer
 
   GeneratedColumn<double> get gstRateOnInterest => $composableBuilder(
     column: $table.gstRateOnInterest,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get netDisbursedAmount => $composableBuilder(
+    column: $table.netDisbursedAmount,
     builder: (column) => column,
   );
 
@@ -7993,6 +9367,29 @@ class $$EmiLoansTableAnnotationComposer
     return composer;
   }
 
+  $$AccountsTableAnnotationComposer get disbursedAccountId {
+    final $$AccountsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.disbursedAccountId,
+      referencedTable: $db.accounts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$AccountsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.accounts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> emiPaymentsRefs<T extends Object>(
     Expression<T> Function($$EmiPaymentsTableAnnotationComposer a) f,
   ) {
@@ -8035,6 +9432,7 @@ class $$EmiLoansTableTableManager
           PrefetchHooks Function({
             bool expenseCategoryId,
             bool defaultAccountId,
+            bool disbursedAccountId,
             bool emiPaymentsRefs,
           })
         > {
@@ -8054,6 +9452,7 @@ class $$EmiLoansTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> productName = const Value.absent(),
                 Value<String?> lenderName = const Value.absent(),
+                Value<String> loanCategory = const Value.absent(),
                 Value<double> principalAmount = const Value.absent(),
                 Value<double> annualInterestRate = const Value.absent(),
                 Value<int> tenureMonths = const Value.absent(),
@@ -8062,6 +9461,10 @@ class $$EmiLoansTableTableManager
                 Value<double> gstRateOnInterest = const Value.absent(),
                 Value<String?> expenseCategoryId = const Value.absent(),
                 Value<String?> defaultAccountId = const Value.absent(),
+                Value<String?> disbursedAccountId = const Value.absent(),
+                Value<double> processingFee = const Value.absent(),
+                Value<bool> isProcessingFeePercentage = const Value.absent(),
+                Value<double?> netDisbursedAmount = const Value.absent(),
                 Value<bool> autoLogExpense = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -8071,6 +9474,7 @@ class $$EmiLoansTableTableManager
                 id: id,
                 productName: productName,
                 lenderName: lenderName,
+                loanCategory: loanCategory,
                 principalAmount: principalAmount,
                 annualInterestRate: annualInterestRate,
                 tenureMonths: tenureMonths,
@@ -8079,6 +9483,10 @@ class $$EmiLoansTableTableManager
                 gstRateOnInterest: gstRateOnInterest,
                 expenseCategoryId: expenseCategoryId,
                 defaultAccountId: defaultAccountId,
+                disbursedAccountId: disbursedAccountId,
+                processingFee: processingFee,
+                isProcessingFeePercentage: isProcessingFeePercentage,
+                netDisbursedAmount: netDisbursedAmount,
                 autoLogExpense: autoLogExpense,
                 status: status,
                 notes: notes,
@@ -8090,6 +9498,7 @@ class $$EmiLoansTableTableManager
                 required String id,
                 required String productName,
                 Value<String?> lenderName = const Value.absent(),
+                Value<String> loanCategory = const Value.absent(),
                 required double principalAmount,
                 required double annualInterestRate,
                 required int tenureMonths,
@@ -8098,6 +9507,10 @@ class $$EmiLoansTableTableManager
                 Value<double> gstRateOnInterest = const Value.absent(),
                 Value<String?> expenseCategoryId = const Value.absent(),
                 Value<String?> defaultAccountId = const Value.absent(),
+                Value<String?> disbursedAccountId = const Value.absent(),
+                Value<double> processingFee = const Value.absent(),
+                Value<bool> isProcessingFeePercentage = const Value.absent(),
+                Value<double?> netDisbursedAmount = const Value.absent(),
                 Value<bool> autoLogExpense = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
@@ -8107,6 +9520,7 @@ class $$EmiLoansTableTableManager
                 id: id,
                 productName: productName,
                 lenderName: lenderName,
+                loanCategory: loanCategory,
                 principalAmount: principalAmount,
                 annualInterestRate: annualInterestRate,
                 tenureMonths: tenureMonths,
@@ -8115,6 +9529,10 @@ class $$EmiLoansTableTableManager
                 gstRateOnInterest: gstRateOnInterest,
                 expenseCategoryId: expenseCategoryId,
                 defaultAccountId: defaultAccountId,
+                disbursedAccountId: disbursedAccountId,
+                processingFee: processingFee,
+                isProcessingFeePercentage: isProcessingFeePercentage,
+                netDisbursedAmount: netDisbursedAmount,
                 autoLogExpense: autoLogExpense,
                 status: status,
                 notes: notes,
@@ -8133,6 +9551,7 @@ class $$EmiLoansTableTableManager
               ({
                 expenseCategoryId = false,
                 defaultAccountId = false,
+                disbursedAccountId = false,
                 emiPaymentsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -8178,6 +9597,19 @@ class $$EmiLoansTableTableManager
                                         ._defaultAccountIdTable(db),
                                     referencedColumn: $$EmiLoansTableReferences
                                         ._defaultAccountIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (disbursedAccountId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.disbursedAccountId,
+                                    referencedTable: $$EmiLoansTableReferences
+                                        ._disbursedAccountIdTable(db),
+                                    referencedColumn: $$EmiLoansTableReferences
+                                        ._disbursedAccountIdTable(db)
                                         .id,
                                   )
                                   as T;
@@ -8231,6 +9663,7 @@ typedef $$EmiLoansTableProcessedTableManager =
       PrefetchHooks Function({
         bool expenseCategoryId,
         bool defaultAccountId,
+        bool disbursedAccountId,
         bool emiPaymentsRefs,
       })
     >;
@@ -8657,6 +10090,363 @@ typedef $$EmiPaymentsTableProcessedTableManager =
       (EmiPayment, $$EmiPaymentsTableReferences),
       EmiPayment,
       PrefetchHooks Function({bool loanId})
+    >;
+typedef $$LoanComparisonsTableCreateCompanionBuilder =
+    LoanComparisonsCompanion Function({
+      required String id,
+      Value<String> groupName,
+      required String lenderName,
+      Value<String> loanCategory,
+      required double principalAmount,
+      required double annualInterestRate,
+      required int tenureMonths,
+      Value<double> processingFee,
+      Value<bool> isProcessingFeePercentage,
+      Value<double> gstRateOnFees,
+      Value<bool> isFinalized,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$LoanComparisonsTableUpdateCompanionBuilder =
+    LoanComparisonsCompanion Function({
+      Value<String> id,
+      Value<String> groupName,
+      Value<String> lenderName,
+      Value<String> loanCategory,
+      Value<double> principalAmount,
+      Value<double> annualInterestRate,
+      Value<int> tenureMonths,
+      Value<double> processingFee,
+      Value<bool> isProcessingFeePercentage,
+      Value<double> gstRateOnFees,
+      Value<bool> isFinalized,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$LoanComparisonsTableFilterComposer
+    extends Composer<_$AppDatabase, $LoanComparisonsTable> {
+  $$LoanComparisonsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get groupName => $composableBuilder(
+    column: $table.groupName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lenderName => $composableBuilder(
+    column: $table.lenderName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get principalAmount => $composableBuilder(
+    column: $table.principalAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get annualInterestRate => $composableBuilder(
+    column: $table.annualInterestRate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get tenureMonths => $composableBuilder(
+    column: $table.tenureMonths,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get gstRateOnFees => $composableBuilder(
+    column: $table.gstRateOnFees,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFinalized => $composableBuilder(
+    column: $table.isFinalized,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LoanComparisonsTableOrderingComposer
+    extends Composer<_$AppDatabase, $LoanComparisonsTable> {
+  $$LoanComparisonsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groupName => $composableBuilder(
+    column: $table.groupName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lenderName => $composableBuilder(
+    column: $table.lenderName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get principalAmount => $composableBuilder(
+    column: $table.principalAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get annualInterestRate => $composableBuilder(
+    column: $table.annualInterestRate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get tenureMonths => $composableBuilder(
+    column: $table.tenureMonths,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get gstRateOnFees => $composableBuilder(
+    column: $table.gstRateOnFees,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isFinalized => $composableBuilder(
+    column: $table.isFinalized,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LoanComparisonsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LoanComparisonsTable> {
+  $$LoanComparisonsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get groupName =>
+      $composableBuilder(column: $table.groupName, builder: (column) => column);
+
+  GeneratedColumn<String> get lenderName => $composableBuilder(
+    column: $table.lenderName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get loanCategory => $composableBuilder(
+    column: $table.loanCategory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get principalAmount => $composableBuilder(
+    column: $table.principalAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get annualInterestRate => $composableBuilder(
+    column: $table.annualInterestRate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get tenureMonths => $composableBuilder(
+    column: $table.tenureMonths,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get processingFee => $composableBuilder(
+    column: $table.processingFee,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isProcessingFeePercentage => $composableBuilder(
+    column: $table.isProcessingFeePercentage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get gstRateOnFees => $composableBuilder(
+    column: $table.gstRateOnFees,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFinalized => $composableBuilder(
+    column: $table.isFinalized,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$LoanComparisonsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $LoanComparisonsTable,
+          LoanComparison,
+          $$LoanComparisonsTableFilterComposer,
+          $$LoanComparisonsTableOrderingComposer,
+          $$LoanComparisonsTableAnnotationComposer,
+          $$LoanComparisonsTableCreateCompanionBuilder,
+          $$LoanComparisonsTableUpdateCompanionBuilder,
+          (
+            LoanComparison,
+            BaseReferences<
+              _$AppDatabase,
+              $LoanComparisonsTable,
+              LoanComparison
+            >,
+          ),
+          LoanComparison,
+          PrefetchHooks Function()
+        > {
+  $$LoanComparisonsTableTableManager(
+    _$AppDatabase db,
+    $LoanComparisonsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LoanComparisonsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LoanComparisonsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LoanComparisonsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> groupName = const Value.absent(),
+                Value<String> lenderName = const Value.absent(),
+                Value<String> loanCategory = const Value.absent(),
+                Value<double> principalAmount = const Value.absent(),
+                Value<double> annualInterestRate = const Value.absent(),
+                Value<int> tenureMonths = const Value.absent(),
+                Value<double> processingFee = const Value.absent(),
+                Value<bool> isProcessingFeePercentage = const Value.absent(),
+                Value<double> gstRateOnFees = const Value.absent(),
+                Value<bool> isFinalized = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LoanComparisonsCompanion(
+                id: id,
+                groupName: groupName,
+                lenderName: lenderName,
+                loanCategory: loanCategory,
+                principalAmount: principalAmount,
+                annualInterestRate: annualInterestRate,
+                tenureMonths: tenureMonths,
+                processingFee: processingFee,
+                isProcessingFeePercentage: isProcessingFeePercentage,
+                gstRateOnFees: gstRateOnFees,
+                isFinalized: isFinalized,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                Value<String> groupName = const Value.absent(),
+                required String lenderName,
+                Value<String> loanCategory = const Value.absent(),
+                required double principalAmount,
+                required double annualInterestRate,
+                required int tenureMonths,
+                Value<double> processingFee = const Value.absent(),
+                Value<bool> isProcessingFeePercentage = const Value.absent(),
+                Value<double> gstRateOnFees = const Value.absent(),
+                Value<bool> isFinalized = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => LoanComparisonsCompanion.insert(
+                id: id,
+                groupName: groupName,
+                lenderName: lenderName,
+                loanCategory: loanCategory,
+                principalAmount: principalAmount,
+                annualInterestRate: annualInterestRate,
+                tenureMonths: tenureMonths,
+                processingFee: processingFee,
+                isProcessingFeePercentage: isProcessingFeePercentage,
+                gstRateOnFees: gstRateOnFees,
+                isFinalized: isFinalized,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LoanComparisonsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $LoanComparisonsTable,
+      LoanComparison,
+      $$LoanComparisonsTableFilterComposer,
+      $$LoanComparisonsTableOrderingComposer,
+      $$LoanComparisonsTableAnnotationComposer,
+      $$LoanComparisonsTableCreateCompanionBuilder,
+      $$LoanComparisonsTableUpdateCompanionBuilder,
+      (
+        LoanComparison,
+        BaseReferences<_$AppDatabase, $LoanComparisonsTable, LoanComparison>,
+      ),
+      LoanComparison,
+      PrefetchHooks Function()
     >;
 typedef $$InvestmentsTableCreateCompanionBuilder =
     InvestmentsCompanion Function({
@@ -9864,6 +11654,8 @@ class $AppDatabaseManager {
       $$EmiLoansTableTableManager(_db, _db.emiLoans);
   $$EmiPaymentsTableTableManager get emiPayments =>
       $$EmiPaymentsTableTableManager(_db, _db.emiPayments);
+  $$LoanComparisonsTableTableManager get loanComparisons =>
+      $$LoanComparisonsTableTableManager(_db, _db.loanComparisons);
   $$InvestmentsTableTableManager get investments =>
       $$InvestmentsTableTableManager(_db, _db.investments);
   $$ChittyInstallmentsTableTableManager get chittyInstallments =>

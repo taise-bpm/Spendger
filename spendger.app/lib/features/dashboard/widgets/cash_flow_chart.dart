@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,21 +14,48 @@ class CashFlowChart extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
     final txAsync = ref.watch(monthlyTransactionsProvider((year: now.year, month: now.month)));
+    final categoriesAsync = ref.watch(categoriesStreamProvider(null));
+
     final transactions = txAsync.value ?? [];
+    final categories = categoriesAsync.value ?? [];
+    final catMap = {for (var c in categories) c.id: c};
 
     double totalIncome = 0.0;
-    double totalExpense = 0.0;
+    double totalLivingExpense = 0.0;
+    double totalInvested = 0.0;
 
     for (final tx in transactions) {
       if (tx.type == 'income') {
         totalIncome += tx.amount;
       } else if (tx.type == 'expense') {
-        totalExpense += tx.amount;
+        final isInvestmentTag = tx.tag != null && tx.tag!.startsWith('INV:');
+        final catName = catMap[tx.categoryId]?.name.toLowerCase() ?? '';
+        final isInvestmentCat = catName.contains('investment') ||
+            catName.contains('sip') ||
+            catName.contains('gold') ||
+            catName.contains('chitty') ||
+            catName.contains('chit') ||
+            catName.contains('fixed deposit') ||
+            catName.contains('ppf') ||
+            catName.contains('provident fund') ||
+            catName.contains('mutual fund') ||
+            catName.contains('stock') ||
+            catName.contains('shares');
+
+        if (isInvestmentTag || isInvestmentCat) {
+          totalInvested += tx.amount;
+        } else {
+          totalLivingExpense += tx.amount;
+        }
       }
     }
 
     final theme = Theme.of(context);
-    final double netSavings = totalIncome - totalExpense;
+    final double totalOutflow = totalLivingExpense + totalInvested;
+    final double netSavings = totalIncome - totalOutflow;
+
+    final double maxVal = [totalIncome, totalLivingExpense, totalInvested].reduce(max);
+    final double chartMaxY = maxVal > 0 ? maxVal * 1.25 : 100.0;
 
     return Card(
       child: Padding(
@@ -59,6 +87,8 @@ class CashFlowChart extends ConsumerWidget {
               ],
             ),
             const Gap(16),
+
+            // Three Flow Indicators: Income, Expense, Invested
             Row(
               children: [
                 Expanded(
@@ -69,31 +99,45 @@ class CashFlowChart extends ConsumerWidget {
                     icon: Icons.arrow_downward,
                   ),
                 ),
-                const Gap(12),
+                const Gap(8),
                 Expanded(
                   child: _buildFlowIndicator(
                     label: 'Expenses',
-                    amount: totalExpense,
+                    amount: totalLivingExpense,
                     color: AppColors.expense,
                     icon: Icons.arrow_upward,
+                  ),
+                ),
+                const Gap(8),
+                Expanded(
+                  child: _buildFlowIndicator(
+                    label: 'Invested',
+                    amount: totalInvested,
+                    color: AppColors.investment,
+                    icon: Icons.trending_up,
                   ),
                 ),
               ],
             ),
             const Gap(20),
+
+            // 3-Bar Chart
             SizedBox(
-              height: 120,
+              height: 130,
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
-                  maxY: (totalIncome > totalExpense ? totalIncome : totalExpense) * 1.25 == 0
-                      ? 100
-                      : (totalIncome > totalExpense ? totalIncome : totalExpense) * 1.25,
+                  maxY: chartMaxY,
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final label = rodIndex == 0 ? 'Income' : 'Expense';
+                        final label = switch (group.x) {
+                          0 => 'Income',
+                          1 => 'Living Expenses',
+                          2 => 'Invested',
+                          _ => 'Amount',
+                        };
                         return BarTooltipItem(
                           '$label\n${CurrencyFormatter.format(rod.toY)}',
                           const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -107,9 +151,18 @@ class CashFlowChart extends ConsumerWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          return Text(
-                            value.toInt() == 0 ? 'In' : 'Out',
-                            style: theme.textTheme.bodySmall,
+                          final text = switch (value.toInt()) {
+                            0 => 'Income',
+                            1 => 'Expense',
+                            2 => 'Invested',
+                            _ => '',
+                          };
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6.0),
+                            child: Text(
+                              text,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
                           );
                         },
                       ),
@@ -127,7 +180,7 @@ class CashFlowChart extends ConsumerWidget {
                         BarChartRodData(
                           toY: totalIncome,
                           color: AppColors.income,
-                          width: 32,
+                          width: 24,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                         ),
                       ],
@@ -136,9 +189,20 @@ class CashFlowChart extends ConsumerWidget {
                       x: 1,
                       barRods: [
                         BarChartRodData(
-                          toY: totalExpense,
+                          toY: totalLivingExpense,
                           color: AppColors.expense,
-                          width: 32,
+                          width: 24,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                        ),
+                      ],
+                    ),
+                    BarChartGroupData(
+                      x: 2,
+                      barRods: [
+                        BarChartRodData(
+                          toY: totalInvested,
+                          color: AppColors.investment,
+                          width: 24,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
                         ),
                       ],
@@ -160,7 +224,7 @@ class CashFlowChart extends ConsumerWidget {
     required IconData icon,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -169,19 +233,24 @@ class CashFlowChart extends ConsumerWidget {
       child: Row(
         children: [
           CircleAvatar(
-            radius: 14,
+            radius: 12,
             backgroundColor: color.withValues(alpha: 0.2),
-            child: Icon(icon, size: 14, color: color),
+            child: Icon(icon, size: 12, color: color),
           ),
-          const Gap(10),
+          const Gap(6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(
                   CurrencyFormatter.formatCompact(amount),
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

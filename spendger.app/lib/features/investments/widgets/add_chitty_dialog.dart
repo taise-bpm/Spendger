@@ -137,9 +137,12 @@ class _AddChittyDialogState extends ConsumerState<AddChittyDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(isEditing ? 'Edit Chit Fund (Chitty)' : 'Add Chit Fund (Chitty)', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SingleChildScrollView(
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Gap(8),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(

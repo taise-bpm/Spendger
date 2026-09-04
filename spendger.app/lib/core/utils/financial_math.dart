@@ -659,6 +659,127 @@ class FinancialMath {
       monthlyBreakdowns: months,
     );
   }
+
+  /// Calculate Processing Fee including GST
+  static Map<String, double> calculateProcessingFee({
+    required double principal,
+    required double processingFeeValue,
+    required bool isPercentage,
+    double gstRate = 18.0,
+  }) {
+    if (processingFeeValue <= 0 || principal <= 0) {
+      return {'baseFee': 0.0, 'gstAmount': 0.0, 'totalDeduction': 0.0};
+    }
+    final baseFee = isPercentage ? (principal * (processingFeeValue / 100)) : processingFeeValue;
+    final gstAmount = baseFee * (gstRate / 100);
+    final totalDeduction = baseFee + gstAmount;
+    return {
+      'baseFee': baseFee,
+      'gstAmount': gstAmount,
+      'totalDeduction': totalDeduction,
+    };
+  }
+
+  /// Calculate Total Processing Fee Deduction Amount
+  static double calculateTotalProcessingFee({
+    required double principal,
+    required double processingFeeValue,
+    required bool isPercentage,
+    double gstRate = 18.0,
+  }) {
+    return calculateProcessingFee(
+      principal: principal,
+      processingFeeValue: processingFeeValue,
+      isPercentage: isPercentage,
+      gstRate: gstRate,
+    )['totalDeduction'] ?? 0.0;
+  }
+
+  /// Evaluate a single loan offer
+  static LoanOfferComparisonResult evaluateLoanOffer(LoanComparisonOffer offer, {double bestCost = 0.0}) {
+    final emi = FinancialMath.calculateEmi(
+      principal: offer.principalAmount,
+      annualInterestRate: offer.annualInterestRate,
+      tenureMonths: offer.tenureMonths,
+    );
+
+    final totalRepayment = emi * offer.tenureMonths;
+    final totalInterest = math.max(0.0, totalRepayment - offer.principalAmount);
+
+    final feeMap = (offer.annualInterestRate == 0 && offer.loanCategory == 'friend_family')
+        ? {'baseFee': 0.0, 'gstAmount': 0.0, 'totalDeduction': 0.0}
+        : calculateProcessingFee(
+            principal: offer.principalAmount,
+            processingFeeValue: offer.processingFee,
+            isPercentage: offer.isProcessingFeePercentage,
+            gstRate: offer.gstRateOnFees,
+          );
+
+    final upfrontFee = feeMap['totalDeduction'] ?? 0.0;
+    final netDisbursed = math.max(0.0, offer.principalAmount - upfrontFee);
+    final totalCost = totalRepayment + upfrontFee;
+
+    // Approximate APR (Annual Percentage Rate)
+    final double apr;
+    if (offer.annualInterestRate == 0) {
+      apr = 0.0;
+    } else if (offer.principalAmount > 0 && offer.tenureMonths > 0) {
+      final annualCostRatio = ((totalInterest + upfrontFee) / offer.principalAmount) * (12.0 / offer.tenureMonths);
+      apr = annualCostRatio * 100.0;
+    } else {
+      apr = offer.annualInterestRate;
+    }
+
+    final delta = bestCost > 0 ? (totalCost - bestCost) : 0.0;
+
+    return LoanOfferComparisonResult(
+      offer: offer,
+      calculatedEmi: emi,
+      totalInterest: totalInterest,
+      totalRepayment: totalRepayment,
+      upfrontProcessingFee: upfrontFee,
+      netDisbursedAmount: netDisbursed,
+      totalCostOfLoan: totalCost,
+      effectiveApr: apr,
+      costDeltaFromBest: delta,
+      isBestOffer: false,
+    );
+  }
+
+  /// Compare multiple loan offers and rank them by total cost
+  static List<LoanOfferComparisonResult> compareLoanOffers(List<LoanComparisonOffer> offers) {
+    if (offers.isEmpty) return [];
+
+    final initialEvaluations = offers.map((o) => evaluateLoanOffer(o)).toList();
+    
+    // Find lowest total cost
+    double lowestCost = initialEvaluations.first.totalCostOfLoan;
+    for (final res in initialEvaluations) {
+      if (res.totalCostOfLoan < lowestCost) {
+        lowestCost = res.totalCostOfLoan;
+      }
+    }
+
+    final results = initialEvaluations.map((res) {
+      final isBest = (res.totalCostOfLoan - lowestCost).abs() < 0.01;
+      return LoanOfferComparisonResult(
+        offer: res.offer,
+        calculatedEmi: res.calculatedEmi,
+        totalInterest: res.totalInterest,
+        totalRepayment: res.totalRepayment,
+        upfrontProcessingFee: res.upfrontProcessingFee,
+        netDisbursedAmount: res.netDisbursedAmount,
+        totalCostOfLoan: res.totalCostOfLoan,
+        effectiveApr: res.effectiveApr,
+        costDeltaFromBest: res.totalCostOfLoan - lowestCost,
+        isBestOffer: isBest,
+      );
+    }).toList();
+
+    // Sort ascending by total cost
+    results.sort((a, b) => a.totalCostOfLoan.compareTo(b.totalCostOfLoan));
+    return results;
+  }
 }
 
 class PpfDepositEntry {
@@ -714,5 +835,63 @@ class PpfFinancialYearResult {
     required this.totalInterestEarnedInFY,
     required this.closingBalanceMarch31,
     required this.monthlyBreakdowns,
+  });
+}
+
+class LoanComparisonOffer {
+  final String id;
+  final String lenderName;
+  final String loanCategory; // 'personal_bank', 'asset_vehicle', 'friend_family', 'other'
+  final double principalAmount;
+  final double annualInterestRate;
+  final int tenureMonths;
+  final double processingFee;
+  final bool isProcessingFeePercentage;
+  final double gstRateOnFees;
+
+  LoanComparisonOffer({
+    required this.id,
+    required this.lenderName,
+    this.loanCategory = 'personal_bank',
+    double? principalAmount,
+    double? principal,
+    required this.annualInterestRate,
+    required this.tenureMonths,
+    double? processingFee,
+    double? processingFeeValue,
+    this.isProcessingFeePercentage = false,
+    this.gstRateOnFees = 18.0,
+  })  : principalAmount = principalAmount ?? principal ?? 0.0,
+        processingFee = processingFee ?? processingFeeValue ?? 0.0;
+}
+
+class LoanOfferComparisonResult {
+  final LoanComparisonOffer offer;
+  final double calculatedEmi;
+  final double totalInterest;
+  final double totalRepayment;
+  final double upfrontProcessingFee;
+  final double netDisbursedAmount;
+  final double totalCostOfLoan;
+  final double effectiveApr;
+  final double costDeltaFromBest;
+  final bool isBestOffer;
+
+  // Compatibility aliases
+  bool get isBestValue => isBestOffer;
+  double get monthlyEmi => calculatedEmi;
+  double get totalCost => totalCostOfLoan;
+
+  LoanOfferComparisonResult({
+    required this.offer,
+    required this.calculatedEmi,
+    required this.totalInterest,
+    required this.totalRepayment,
+    required this.upfrontProcessingFee,
+    required this.netDisbursedAmount,
+    required this.totalCostOfLoan,
+    required this.effectiveApr,
+    required this.costDeltaFromBest,
+    required this.isBestOffer,
   });
 }

@@ -236,10 +236,13 @@ class _RecordEmiPaymentDialogState extends ConsumerState<RecordEmiPaymentDialog>
         ],
       ),
       content: SingleChildScrollView(
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Gap(8),
             // Total EMI field
             TextField(
               controller: _totalEmiController,

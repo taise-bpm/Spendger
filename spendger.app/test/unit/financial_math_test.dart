@@ -174,5 +174,100 @@ void main() {
       expect(schedule.last.projectedBalance, greaterThan(2700000.0));
     });
   });
+
+  group('FinancialMath - Loan Disbursals, Fees & Comparison Studio', () {
+    test('calculateProcessingFee calculates percentage + 18% GST correctly', () {
+      // Principal: 200,000, Fee: 1.5% -> Base Fee: 3000, GST (18% of 3000): 540 -> Total Fee: 3540
+      final feeResult = FinancialMath.calculateProcessingFee(
+        principal: 200000,
+        processingFeeValue: 1.5,
+        isPercentage: true,
+        gstRate: 18.0,
+      );
+
+      expect(feeResult['baseFee'], equals(3000.0));
+      expect(feeResult['gstAmount'], equals(540.0));
+      expect(feeResult['totalDeduction'], equals(3540.0));
+    });
+
+    test('calculateProcessingFee calculates flat fee + GST correctly', () {
+      // Principal: 50,000, Flat Fee: 1000, GST: 18% -> Base: 1000, GST: 180 -> Total: 1180
+      final feeResult = FinancialMath.calculateProcessingFee(
+        principal: 50000,
+        processingFeeValue: 1000,
+        isPercentage: false,
+        gstRate: 18.0,
+      );
+
+      expect(feeResult['baseFee'], equals(1000.0));
+      expect(feeResult['gstAmount'], equals(180.0));
+      expect(feeResult['totalDeduction'], equals(1180.0));
+    });
+
+    test('evaluateLoanOffer computes 0% interest Friends & Family loan accurately', () {
+      // 0% interest loan from friend: 120,000 for 12 months, ₹0 fee
+      // Monthly EMI = 120,000 / 12 = 10,000
+      // Total Interest = 0, Net Disbursed = 120,000, Effective APR = 0%
+      final friendLoan = LoanComparisonOffer(
+        id: 'friend_1',
+        lenderName: 'Friend / Family (Zero Interest)',
+        principal: 120000,
+        annualInterestRate: 0.0,
+        tenureMonths: 12,
+        processingFeeValue: 0.0,
+        isProcessingFeePercentage: false,
+        loanCategory: 'friend_family',
+      );
+
+      final result = FinancialMath.evaluateLoanOffer(friendLoan);
+
+      expect(result.monthlyEmi, equals(10000.0));
+      expect(result.totalInterest, equals(0.0));
+      expect(result.totalRepayment, equals(120000.0));
+      expect(result.netDisbursedAmount, equals(120000.0));
+      expect(result.effectiveApr, equals(0.0));
+    });
+
+    test('compareLoanOffers ranks multiple bank offers and assigns best value flag', () {
+      final offerA = LoanComparisonOffer(
+        id: 'bank_a',
+        lenderName: 'HDFC Bank Personal Loan',
+        principal: 500000,
+        annualInterestRate: 10.5,
+        tenureMonths: 36,
+        processingFeeValue: 1.0,
+        isProcessingFeePercentage: true,
+      );
+
+      final offerB = LoanComparisonOffer(
+        id: 'bank_b',
+        lenderName: 'SBI Express Credit',
+        principal: 500000,
+        annualInterestRate: 9.9, // Lower interest rate
+        tenureMonths: 36,
+        processingFeeValue: 1.5,
+        isProcessingFeePercentage: true,
+      );
+
+      final offerC = LoanComparisonOffer(
+        id: 'friend_c',
+        lenderName: 'Family Support',
+        principal: 500000,
+        annualInterestRate: 0.0, // Zero interest
+        tenureMonths: 36,
+        processingFeeValue: 0.0,
+        isProcessingFeePercentage: false,
+        loanCategory: 'friend_family',
+      );
+
+      final results = FinancialMath.compareLoanOffers([offerA, offerB, offerC]);
+
+      expect(results.length, equals(3));
+      // Family support with 0% interest must be the best value
+      expect(results.first.offer.id, equals('friend_c'));
+      expect(results.first.isBestValue, isTrue);
+      expect(results.first.totalCost, equals(500000.0));
+    });
+  });
 }
 

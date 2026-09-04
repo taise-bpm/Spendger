@@ -25,6 +25,7 @@ LazyDatabase _openConnection() {
   Budgets,
   EmiLoans,
   EmiPayments,
+  LoanComparisons,
   Investments,
   ChittyInstallments,
   Reminders,
@@ -33,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? e]) : super(e ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -43,14 +44,96 @@ class AppDatabase extends _$AppDatabase {
     },
     onUpgrade: (Migrator m, int from, int to) async {
       if (from < 2) {
-        await m.addColumn(emiLoans, emiLoans.expenseCategoryId);
-        await m.addColumn(emiLoans, emiLoans.defaultAccountId);
-        await m.addColumn(emiLoans, emiLoans.autoLogExpense);
+        await m.addColumn(emiLoans, emiLoans.expenseCategoryId).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.defaultAccountId).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.autoLogExpense).catchError((_) {});
       }
       if (from < 3) {
-        await m.addColumn(accounts, accounts.creditLimit);
-        await m.addColumn(transactions, transactions.toAccountId);
+        await m.addColumn(accounts, accounts.creditLimit).catchError((_) {});
       }
+      if (from < 4) {
+        await m.addColumn(accounts, accounts.isActive).catchError((_) {});
+      }
+      if (from < 5) {
+        await customStatement('ALTER TABLE transactions ADD COLUMN to_account_id TEXT REFERENCES accounts (id) ON DELETE SET NULL;').catchError((_) {});
+      }
+      if (from < 6) {
+        await m.createTable(loanComparisons).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.loanCategory).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.disbursedAccountId).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.processingFee).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.isProcessingFeePercentage).catchError((_) {});
+        await m.addColumn(emiLoans, emiLoans.netDisbursedAmount).catchError((_) {});
+      }
+      if (from < 7) {
+        await m.addColumn(accounts, accounts.defaultPayFromAccountId).catchError((_) {});
+      }
+    },
+    beforeOpen: (details) async {
+      // Self-healing migration checks: guarantee all columns & tables exist even on hot-reload/upgrade
+      try {
+        await customStatement('ALTER TABLE transactions ADD COLUMN to_account_id TEXT REFERENCES accounts (id) ON DELETE SET NULL;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE accounts ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE accounts ADD COLUMN credit_limit REAL;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE accounts ADD COLUMN default_pay_from_account_id TEXT REFERENCES accounts (id) ON DELETE SET NULL;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE emi_loans ADD COLUMN loan_category TEXT NOT NULL DEFAULT \'personal_bank\';');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE emi_loans ADD COLUMN disbursed_account_id TEXT REFERENCES accounts (id) ON DELETE SET NULL;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE emi_loans ADD COLUMN processing_fee REAL NOT NULL DEFAULT 0.0;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE emi_loans ADD COLUMN is_processing_fee_percentage INTEGER NOT NULL DEFAULT 0;');
+      } catch (_) {}
+      try {
+        await customStatement('ALTER TABLE emi_loans ADD COLUMN net_disbursed_amount REAL;');
+      } catch (_) {}
+      try {
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS loan_comparisons (
+            id TEXT NOT NULL PRIMARY KEY,
+            group_name TEXT NOT NULL DEFAULT 'General Comparison',
+            lender_name TEXT NOT NULL,
+            loan_category TEXT NOT NULL DEFAULT 'personal_bank',
+            principal_amount REAL NOT NULL,
+            annual_interest_rate REAL NOT NULL,
+            tenure_months INTEGER NOT NULL,
+            processing_fee REAL NOT NULL DEFAULT 0.0,
+            is_processing_fee_percentage INTEGER NOT NULL DEFAULT 0,
+            gst_rate_on_fees REAL NOT NULL DEFAULT 18.0,
+            is_finalized INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+          );
+        ''');
+      } catch (_) {}
+      try {
+        final existingDisbursalCat = await (select(categories)
+              ..where((c) => c.name.equals('Loan Disbursement') & c.type.equals('income')))
+            .getSingleOrNull();
+        if (existingDisbursalCat == null) {
+          const uuid = Uuid();
+          await into(categories).insert(
+            CategoriesCompanion.insert(
+              id: uuid.v4(),
+              name: 'Loan Disbursement',
+              type: 'income',
+              iconCode: Icons.account_balance.codePoint,
+              colorValue: 0xFFF59E0B,
+            ),
+          );
+        }
+      } catch (_) {}
+      await customStatement('PRAGMA foreign_keys = ON;');
     },
   );
 
@@ -145,6 +228,13 @@ class AppDatabase extends _$AppDatabase {
         iconCode: Icons.card_giftcard.codePoint,
         colorValue: 0xFFF59E0B, // Amber
       ),
+      CategoriesCompanion.insert(
+        id: uuid.v4(),
+        name: 'Loan Disbursement',
+        type: 'income',
+        iconCode: Icons.account_balance.codePoint,
+        colorValue: 0xFFF59E0B, // Amber / Loan Accent
+      ),
     ];
 
     for (final cat in defaultCategories) {
@@ -213,12 +303,43 @@ class AppDatabase extends _$AppDatabase {
   }
 
   // Accounts
-  Stream<List<Account>> watchAccounts() {
-    return (select(accounts)..orderBy([(a) => OrderingTerm(expression: a.name)])).watch();
+  Stream<List<Account>> watchAccounts({bool? onlyActive}) {
+    final query = select(accounts);
+    if (onlyActive == true) {
+      query.where((a) => a.isActive.equals(true));
+    }
+    query.orderBy([(a) => OrderingTerm(expression: a.name)]);
+    return query.watch();
   }
 
-  Future<List<Account>> getAllAccounts() {
-    return select(accounts).get();
+  Future<List<Account>> getAllAccounts({bool? onlyActive}) {
+    final query = select(accounts);
+    if (onlyActive == true) {
+      query.where((a) => a.isActive.equals(true));
+    }
+    query.orderBy([(a) => OrderingTerm(expression: a.name)]);
+    return query.get();
+  }
+
+  Future<void> toggleAccountActive(String id, bool isActive) async {
+    await (update(accounts)..where((a) => a.id.equals(id))).write(
+      AccountsCompanion(isActive: Value(isActive)),
+    );
+  }
+
+  Future<void> upsertAccount(AccountsCompanion acc) async {
+    await into(accounts).insertOnConflictUpdate(acc);
+  }
+
+  Future<void> deleteAccount(String id) async {
+    // Check if transactions exist for this account
+    final linkedTx = await (select(transactions)..where((t) => t.accountId.equals(id) | t.toAccountId.equals(id))).get();
+    if (linkedTx.isNotEmpty) {
+      // Soft-deactivate instead of hard deleting to preserve transaction integrity
+      await toggleAccountActive(id, false);
+    } else {
+      await (delete(accounts)..where((a) => a.id.equals(id))).go();
+    }
   }
 
   // Transactions
@@ -236,14 +357,6 @@ class AppDatabase extends _$AppDatabase {
           ..where((t) => t.transactionDate.isBiggerOrEqualValue(start) & t.transactionDate.isSmallerOrEqualValue(end))
           ..orderBy([(t) => OrderingTerm(expression: t.transactionDate, mode: OrderingMode.desc)]))
         .watch();
-  }
-
-  Future<void> upsertAccount(AccountsCompanion acc) async {
-    await into(accounts).insertOnConflictUpdate(acc);
-  }
-
-  Future<void> deleteAccount(String id) async {
-    await (delete(accounts)..where((a) => a.id.equals(id))).go();
   }
 
   Future<void> addTransactionWithAccountUpdate(TransactionsCompanion tx) async {
@@ -264,16 +377,21 @@ class AppDatabase extends _$AppDatabase {
           }
         }
         // Destination Account (Credit)
-        final tag = tx.tag.value;
-        if (tag != null && tag.startsWith('TRANSFER:')) {
-          final parts = tag.split(':');
-          if (parts.length >= 3) {
-            final destId = parts[2];
-            final destAcc = await (select(accounts)..where((a) => a.id.equals(destId))).getSingleOrNull();
-            if (destAcc != null) {
-              await (update(accounts)..where((a) => a.id.equals(destAcc.id)))
-                  .write(AccountsCompanion(currentBalance: Value(destAcc.currentBalance + amount)));
+        String? destId = tx.toAccountId.value;
+        if (destId == null) {
+          final tag = tx.tag.value;
+          if (tag != null && tag.startsWith('TRANSFER:')) {
+            final parts = tag.split(':');
+            if (parts.length >= 3) {
+              destId = parts[2];
             }
+          }
+        }
+        if (destId != null) {
+          final destAcc = await (select(accounts)..where((a) => a.id.equals(destId!))).getSingleOrNull();
+          if (destAcc != null) {
+            await (update(accounts)..where((a) => a.id.equals(destAcc.id)))
+                .write(AccountsCompanion(currentBalance: Value(destAcc.currentBalance + amount)));
           }
         }
       } else if (tx.accountId.value != null) {
@@ -303,14 +421,12 @@ class AppDatabase extends _$AppDatabase {
                 .write(AccountsCompanion(currentBalance: Value(src.currentBalance + oldTx.amount)));
           }
         }
-        if (oldTx.tag != null && oldTx.tag!.startsWith('TRANSFER:')) {
-          final parts = oldTx.tag!.split(':');
-          if (parts.length >= 3) {
-            final dest = await (select(accounts)..where((a) => a.id.equals(parts[2]))).getSingleOrNull();
-            if (dest != null) {
-              await (update(accounts)..where((a) => a.id.equals(dest.id)))
-                  .write(AccountsCompanion(currentBalance: Value(dest.currentBalance - oldTx.amount)));
-            }
+        final oldDestId = oldTx.toAccountId ?? (oldTx.tag != null && oldTx.tag!.startsWith('TRANSFER:') ? oldTx.tag!.split(':')[2] : null);
+        if (oldDestId != null) {
+          final dest = await (select(accounts)..where((a) => a.id.equals(oldDestId))).getSingleOrNull();
+          if (dest != null) {
+            await (update(accounts)..where((a) => a.id.equals(dest.id)))
+                .write(AccountsCompanion(currentBalance: Value(dest.currentBalance - oldTx.amount)));
           }
         }
       } else if (oldTx.accountId != null) {
@@ -340,15 +456,12 @@ class AppDatabase extends _$AppDatabase {
                 .write(AccountsCompanion(currentBalance: Value(src.currentBalance - newAmount)));
           }
         }
-        final tag = newTx.tag.value;
-        if (tag != null && tag.startsWith('TRANSFER:')) {
-          final parts = tag.split(':');
-          if (parts.length >= 3) {
-            final dest = await (select(accounts)..where((a) => a.id.equals(parts[2]))).getSingleOrNull();
-            if (dest != null) {
-              await (update(accounts)..where((a) => a.id.equals(dest.id)))
-                  .write(AccountsCompanion(currentBalance: Value(dest.currentBalance + newAmount)));
-            }
+        final newDestId = newTx.toAccountId.value ?? (newTx.tag.value != null && newTx.tag.value!.startsWith('TRANSFER:') ? newTx.tag.value!.split(':')[2] : null);
+        if (newDestId != null) {
+          final dest = await (select(accounts)..where((a) => a.id.equals(newDestId))).getSingleOrNull();
+          if (dest != null) {
+            await (update(accounts)..where((a) => a.id.equals(dest.id)))
+                .write(AccountsCompanion(currentBalance: Value(dest.currentBalance + newAmount)));
           }
         }
       } else if (newTx.accountId.value != null) {
@@ -382,14 +495,12 @@ class AppDatabase extends _$AppDatabase {
                   .write(AccountsCompanion(currentBalance: Value(src.currentBalance + tx.amount)));
             }
           }
-          if (tx.tag != null && tx.tag!.startsWith('TRANSFER:')) {
-            final parts = tx.tag!.split(':');
-            if (parts.length >= 3) {
-              final dest = await (select(accounts)..where((a) => a.id.equals(parts[2]))).getSingleOrNull();
-              if (dest != null) {
-                await (update(accounts)..where((a) => a.id.equals(dest.id)))
-                    .write(AccountsCompanion(currentBalance: Value(dest.currentBalance - tx.amount)));
-              }
+          final destId = tx.toAccountId ?? (tx.tag != null && tx.tag!.startsWith('TRANSFER:') ? tx.tag!.split(':')[2] : null);
+          if (destId != null) {
+            final dest = await (select(accounts)..where((a) => a.id.equals(destId))).getSingleOrNull();
+            if (dest != null) {
+              await (update(accounts)..where((a) => a.id.equals(dest.id)))
+                  .write(AccountsCompanion(currentBalance: Value(dest.currentBalance - tx.amount)));
             }
           }
         } else if (tx.accountId != null) {
@@ -410,6 +521,27 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<String> _getOrCreateTransferCategory() async {
+    final existing = await (select(categories)..where((c) => c.name.equals('Transfers & Payments'))).getSingleOrNull();
+    if (existing != null) return existing.id;
+
+    final anyCat = await (select(categories)..limit(1)).getSingleOrNull();
+    if (anyCat != null) return anyCat.id;
+
+    const uuid = Uuid();
+    final newId = uuid.v4();
+    await into(categories).insert(
+      CategoriesCompanion.insert(
+        id: newId,
+        name: 'Transfers & Payments',
+        type: 'expense',
+        iconCode: Icons.swap_horiz.codePoint,
+        colorValue: 0xFF6366F1,
+      ),
+    );
+    return newId;
+  }
+
   /// Record Self/Intra-Transfer between user accounts
   Future<void> recordIntraTransfer({
     required String fromAccountId,
@@ -426,9 +558,7 @@ class AppDatabase extends _$AppDatabase {
     const uuid = Uuid();
     final defaultNote = 'Self Transfer: $fromName ➔ $toName';
 
-    // Get or create transfer category
-    final cats = await getAllCategories();
-    final catId = cats.first.id;
+    final catId = await _getOrCreateTransferCategory();
 
     await addTransactionWithAccountUpdate(
       TransactionsCompanion.insert(
@@ -441,6 +571,40 @@ class AppDatabase extends _$AppDatabase {
         transactionDate: date,
         notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
         tag: Value('TRANSFER:$fromAccountId:$toAccountId'),
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Record Credit Card Bill Payment from a Bank/Cash account to settle card dues
+  Future<void> recordCreditCardBillPayment({
+    required String fromAccountId,
+    required String creditCardAccountId,
+    required double amount,
+    required DateTime date,
+    String? note,
+  }) async {
+    final fromAcc = await (select(accounts)..where((a) => a.id.equals(fromAccountId))).getSingleOrNull();
+    final cardAcc = await (select(accounts)..where((a) => a.id.equals(creditCardAccountId))).getSingleOrNull();
+    final fromName = fromAcc?.name ?? 'Bank Account';
+    final cardName = cardAcc?.name ?? 'Credit Card';
+
+    const uuid = Uuid();
+    final defaultNote = 'Credit Card Bill Payment: $cardName (from $fromName)';
+
+    final catId = await _getOrCreateTransferCategory();
+
+    await addTransactionWithAccountUpdate(
+      TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: catId,
+        accountId: Value(fromAccountId),
+        toAccountId: Value(creditCardAccountId),
+        amount: amount,
+        type: 'transfer',
+        transactionDate: date,
+        notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
+        tag: Value('TRANSFER:$fromAccountId:$creditCardAccountId'),
         createdAt: DateTime.now(),
       ),
     );
@@ -624,19 +788,94 @@ class AppDatabase extends _$AppDatabase {
     return query.watch();
   }
 
+  /// Create a loan with optional immediate account disbursal
+  Future<void> createLoanWithDisbursal({
+    required EmiLoansCompanion loan,
+    required bool disburseToAccount,
+    String? destinationAccountId,
+    double? netDisbursalAmount,
+  }) async {
+    await transaction(() async {
+      await into(emiLoans).insert(loan);
+
+      if (disburseToAccount && destinationAccountId != null && netDisbursalAmount != null && netDisbursalAmount > 0) {
+        final loanName = loan.productName.value;
+        final lender = loan.lenderName.value ?? 'Lender';
+
+        // Find or create 'Loan Disbursement' income category (default header)
+        final incomeCategories = await getAllCategories(type: 'income');
+        var disbursalCategory = incomeCategories.where((c) => c.name.toLowerCase() == 'loan disbursement').firstOrNull ??
+            incomeCategories.where((c) => c.name.toLowerCase().contains('loan disburs')).firstOrNull ??
+            incomeCategories.where((c) => c.name.toLowerCase().contains('loan')).firstOrNull;
+
+        if (disbursalCategory == null) {
+          const uuid = Uuid();
+          final newCatId = uuid.v4();
+          await into(categories).insert(
+            CategoriesCompanion.insert(
+              id: newCatId,
+              name: 'Loan Disbursement',
+              type: 'income',
+              iconCode: Icons.account_balance.codePoint,
+              colorValue: 0xFFF59E0B, // Amber
+            ),
+          );
+          disbursalCategory = await (select(categories)..where((c) => c.id.equals(newCatId))).getSingle();
+        }
+
+        const uuid = Uuid();
+        // Credit the bank/cash account with net disbursed funds
+        await addTransactionWithAccountUpdate(
+          TransactionsCompanion.insert(
+            id: uuid.v4(),
+            categoryId: disbursalCategory.id,
+            accountId: Value(destinationAccountId),
+            amount: netDisbursalAmount,
+            type: 'income',
+            transactionDate: loan.startDate.value,
+            notes: Value('Loan Disbursal: $loanName ($lender) • Net Credited'),
+            tag: Value('LOAN_DISBURSE:${loan.id.value}'),
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+    });
+  }
+
   Future<void> updateLoan(String id, EmiLoansCompanion loan) async {
     await (update(emiLoans)..where((l) => l.id.equals(id))).write(loan);
   }
 
   Future<void> deleteLoan(String id) async {
     await transaction(() async {
-      final allTx = await (select(transactions)..where((t) => t.tag.like('EMI:$id:%'))).get();
+      final allTx = await (select(transactions)..where((t) => t.tag.like('EMI:$id:%') | t.tag.like('LOAN_DISBURSE:$id%'))).get();
       for (final tx in allTx) {
         await deleteTransactionWithAccountUpdate(tx.id);
       }
       await (delete(emiPayments)..where((p) => p.loanId.equals(id))).go();
       await (delete(emiLoans)..where((l) => l.id.equals(id))).go();
     });
+  }
+
+  // Loan Comparisons Streams & CRUD
+  Stream<List<LoanComparison>> watchLoanComparisons() {
+    return (select(loanComparisons)..orderBy([(c) => OrderingTerm(expression: c.createdAt, mode: OrderingMode.desc)])).watch();
+  }
+
+  Future<List<LoanComparison>> getAllLoanComparisons() {
+    return (select(loanComparisons)..orderBy([(c) => OrderingTerm(expression: c.createdAt, mode: OrderingMode.desc)])).get();
+  }
+
+  Future<void> upsertLoanComparison(LoanComparisonsCompanion comp) async {
+    await into(loanComparisons).insertOnConflictUpdate(comp);
+  }
+
+  Future<void> deleteLoanComparison(String id) async {
+    await (delete(loanComparisons)..where((c) => c.id.equals(id))).go();
+  }
+
+  Future<void> clearLoanComparisons() async {
+    await delete(loanComparisons).go();
   }
 
   Stream<List<EmiPayment>> watchPaymentsForLoan(String loanId) {

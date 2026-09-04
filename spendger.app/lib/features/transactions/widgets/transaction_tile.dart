@@ -24,9 +24,23 @@ class TransactionTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isTransfer = transaction.type == 'transfer';
     final isIncome = transaction.type == 'income';
-    final amountColor = isIncome ? AppColors.incomeLight : AppColors.expenseLight;
-    final prefix = isIncome ? '+' : '-';
+    final amountColor = isTransfer
+        ? Colors.lightBlueAccent
+        : (isIncome ? AppColors.incomeLight : AppColors.expenseLight);
+    final prefix = isTransfer ? '⇄' : (isIncome ? '+' : '-');
+
+    final titleText = isTransfer
+        ? (transaction.notes ?? 'Self / Account Transfer')
+        : (category?.name ?? 'Uncategorized');
+
+    final avatarIcon = isTransfer
+        ? Icons.swap_horiz
+        : (category != null ? IconHelper.getIcon(category!.iconCode) : Icons.attach_money);
+    final avatarColor = isTransfer
+        ? Colors.lightBlueAccent
+        : (category != null ? Color(category!.colorValue) : Colors.grey);
 
     return Dismissible(
       key: Key(transaction.id),
@@ -53,12 +67,14 @@ class TransactionTile extends ConsumerWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => QuickAddSheet(transactionToEdit: transaction),
-            );
+            if (!isTransfer) {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => QuickAddSheet(transactionToEdit: transaction),
+              );
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -66,15 +82,11 @@ class TransactionTile extends ConsumerWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: category != null
-                      ? Color(category!.colorValue).withValues(alpha: 0.15)
-                      : Colors.grey.withValues(alpha: 0.15),
+                  backgroundColor: avatarColor.withValues(alpha: 0.15),
                   child: Icon(
-                    category != null
-                        ? IconHelper.getIcon(category!.iconCode)
-                        : Icons.attach_money,
+                    avatarIcon,
                     size: 20,
-                    color: category != null ? Color(category!.colorValue) : Colors.grey,
+                    color: avatarColor,
                   ),
                 ),
                 const Gap(12),
@@ -83,8 +95,9 @@ class TransactionTile extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        category?.name ?? 'Uncategorized',
+                        titleText,
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const Gap(2),
                       Row(
@@ -104,7 +117,7 @@ class TransactionTile extends ConsumerWidget {
                             DateFormat('hh:mm a').format(transaction.transactionDate),
                             style: const TextStyle(fontSize: 11, color: Colors.grey),
                           ),
-                          if (transaction.notes != null && transaction.notes!.isNotEmpty) ...[
+                          if (!isTransfer && transaction.notes != null && transaction.notes!.isNotEmpty) ...[
                             const Text(' • ', style: TextStyle(fontSize: 11, color: Colors.grey)),
                             Expanded(
                               child: Text(

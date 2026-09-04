@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/providers/database_provider.dart';
+import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/icon_helper.dart';
 
 class AddEditAccountDialog extends ConsumerStatefulWidget {
   final Account? accountToEdit;
@@ -22,7 +24,9 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
   final _balanceController = TextEditingController();
   final _creditLimitController = TextEditingController();
 
+  bool _isActive = true;
   String _accountType = 'bank'; // 'bank', 'credit_card', 'cash', 'wallet'
+  String? _defaultPayFromAccountId;
   int _selectedColor = 0xFF6366F1;
   int _selectedIcon = Icons.account_balance.codePoint;
 
@@ -34,8 +38,10 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
       _nameController.text = acc.name;
       _balanceController.text = acc.currentBalance.toStringAsFixed(0);
       _accountType = acc.accountType;
+      _defaultPayFromAccountId = acc.defaultPayFromAccountId;
       _selectedColor = acc.colorValue;
       _selectedIcon = acc.iconCode;
+      _isActive = acc.isActive;
       if (acc.creditLimit != null) {
         _creditLimitController.text = acc.creditLimit!.toStringAsFixed(0);
       }
@@ -53,9 +59,11 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
   Future<void> _saveAccount() async {
     final name = _nameController.text.trim();
     final balance = double.tryParse(_balanceController.text.trim()) ?? 0.0;
-    final creditLimit = _accountType == 'card' || _accountType == 'credit_card'
+    final isCard = _accountType == 'card' || _accountType == 'credit_card';
+    final creditLimit = isCard
         ? double.tryParse(_creditLimitController.text.trim())
         : null;
+    final defaultPayFrom = isCard ? _defaultPayFromAccountId : null;
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -76,6 +84,8 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
         accountType: drift.Value(_accountType),
         currentBalance: drift.Value(balance),
         creditLimit: drift.Value(creditLimit),
+        defaultPayFromAccountId: drift.Value(defaultPayFrom),
+        isActive: drift.Value(_isActive),
         iconCode: drift.Value(_selectedIcon),
         colorValue: drift.Value(_selectedColor),
       ),
@@ -97,16 +107,27 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
     final isEditing = widget.accountToEdit != null;
     final isCard = _accountType == 'card' || _accountType == 'credit_card';
 
+    final accountsAsync = ref.watch(activeAccountsStreamProvider);
+    final allAccounts = accountsAsync.value ?? [];
+    final availablePayFromAccounts = allAccounts.where((a) =>
+      a.id != (widget.accountToEdit?.id ?? '') &&
+      a.accountType != 'card' &&
+      a.accountType != 'credit_card'
+    ).toList();
+
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(isEditing ? 'Edit Account' : 'New Account / Card', style: const TextStyle(fontWeight: FontWeight.bold)),
       content: SizedBox(
         width: MediaQuery.of(context).size.width * 0.9,
         child: SingleChildScrollView(
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.only(top: 8, bottom: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Gap(8),
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -155,7 +176,7 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
                 controller: _balanceController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                 decoration: InputDecoration(
-                  labelText: isCard ? 'Current Outstanding Balance (₹)' : 'Current Balance (₹)',
+                  labelText: isCard ? 'Current Outstanding Due (₹)' : 'Current Balance (₹)',
                   hintText: 'e.g. 25000',
                   prefixIcon: const Icon(Icons.currency_rupee),
                 ),
@@ -170,6 +191,55 @@ class _AddEditAccountDialogState extends ConsumerState<AddEditAccountDialog> {
                     hintText: 'e.g. 150000',
                     prefixIcon: Icon(Icons.credit_score),
                   ),
+                ),
+                const Gap(10),
+                DropdownButtonFormField<String?>(
+                  initialValue: availablePayFromAccounts.any((a) => a.id == _defaultPayFromAccountId)
+                      ? _defaultPayFromAccountId
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Default "Pay From" Account (Optional)',
+                    hintText: 'Select account for quick bill pay',
+                    prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('None / Choose Each Time', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    ),
+                    ...availablePayFromAccounts.map((a) => DropdownMenuItem<String?>(
+                          value: a.id,
+                          child: Row(
+                            children: [
+                              Icon(IconHelper.getIcon(a.iconCode), size: 16, color: Color(a.colorValue)),
+                              const Gap(8),
+                              Expanded(
+                                child: Text(
+                                  '${a.name} (${CurrencyFormatter.format(a.currentBalance)})',
+                                  style: const TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                  onChanged: (val) => setState(() => _defaultPayFromAccountId = val),
+                ),
+              ],
+              if (isEditing) ...[
+                const Gap(10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Account Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: Text(
+                    _isActive ? 'Active & In-Use' : 'Archived / Inactive (Preserved in history)',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  value: _isActive,
+                  activeThumbColor: AppColors.incomeLight,
+                  onChanged: (val) => setState(() => _isActive = val),
                 ),
               ],
             ],
