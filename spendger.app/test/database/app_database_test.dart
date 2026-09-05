@@ -51,7 +51,7 @@ void main() {
       expect(updatedAcc.currentBalance, equals(acc.currentBalance - 250.0));
     });
 
-    test('EMI Loan creation and payments insertion', () async {
+    test('EMI Loan creation and payments insertion and outstanding calculation', () async {
       const uuid = Uuid();
       final loanId = uuid.v4();
 
@@ -71,6 +71,27 @@ void main() {
       final loans = await db.watchLoans(status: 'active').first;
       expect(loans.length, equals(1));
       expect(loans.first.productName, equals('Car Loan'));
+
+      // Record EMI payment with principal component
+      await db.recordOrUpdateEmiPayment(
+        loanId: loanId,
+        installmentNumber: 1,
+        paymentDate: DateTime.now(),
+        principalPaid: 7236.0,
+        interestPaid: 2375.0,
+        gstPaid: 0.0,
+        totalAmountPaid: 9611.0,
+      );
+
+      final allPayments = await db.watchAllPayments().first;
+      expect(allPayments.length, equals(1));
+      expect(allPayments.first.principalPaid, equals(7236.0));
+
+      final loanPaidPrincipal = allPayments
+          .where((p) => p.loanId == loanId)
+          .fold(0.0, (sum, p) => sum + p.principalPaid);
+      final outstanding = loans.first.principalAmount - loanPaidPrincipal;
+      expect(outstanding, equals(292764.0));
     });
 
     test('Investment CRUD and Investment Ledger sync with Accounts', () async {

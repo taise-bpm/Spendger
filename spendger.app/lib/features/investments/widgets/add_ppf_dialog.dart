@@ -23,6 +23,7 @@ class AddPpfDialog extends ConsumerStatefulWidget {
 
 class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
   final _nameController = TextEditingController(text: 'Public Provident Fund (PPF)');
+  final _openingBalanceController = TextEditingController(text: '0');
   final _yearlyDepositController = TextEditingController(text: '150000');
   final _rateController = TextEditingController(text: '7.1');
   final _tenureYearsController = TextEditingController(text: '15');
@@ -43,6 +44,11 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
           final notesData = jsonDecode(inv.notes!);
           if (notesData['rate'] != null) _rateController.text = notesData['rate'].toString();
           if (notesData['tenureYears'] != null) _tenureYearsController.text = notesData['tenureYears'].toString();
+          if (notesData['openingBalance'] != null) {
+            _openingBalanceController.text = (notesData['openingBalance'] as num).toDouble().toStringAsFixed(0);
+          } else {
+            _openingBalanceController.text = inv.currentValuation.toStringAsFixed(0);
+          }
         } catch (_) {}
       }
     }
@@ -52,6 +58,7 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _openingBalanceController.dispose();
     _yearlyDepositController.dispose();
     _rateController.dispose();
     _tenureYearsController.dispose();
@@ -80,6 +87,7 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
 
   Future<void> _savePpf() async {
     final name = _nameController.text.trim();
+    final openingBalance = double.tryParse(_openingBalanceController.text.trim()) ?? 0.0;
     final yearly = double.tryParse(_yearlyDepositController.text.trim());
     final rate = double.tryParse(_rateController.text.trim());
     final years = int.tryParse(_tenureYearsController.text.trim());
@@ -100,10 +108,22 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
     final db = ref.read(databaseProvider);
     final maturityDate = DateTime(_startDate.year + years, _startDate.month, _startDate.day);
 
+    double oldOpeningBalance = 0.0;
+    if (widget.investmentToEdit?.notes != null) {
+      try {
+        final oldNotes = jsonDecode(widget.investmentToEdit!.notes!);
+        oldOpeningBalance = (oldNotes['openingBalance'] as num?)?.toDouble() ?? 0.0;
+      } catch (_) {}
+    }
+    final deltaOpening = openingBalance - oldOpeningBalance;
+    final updatedValuation = ((widget.investmentToEdit?.currentValuation ?? 0.0) + deltaOpening).clamp(0.0, double.infinity);
+
     final notesData = jsonEncode({
       'rate': rate,
       'tenureYears': years,
       'yearlyDeposit': yearly,
+      'openingBalance': openingBalance,
+      'expectedMaturityAmount': maturityResult.maturityAmount,
       'interestEarned': maturityResult.totalInterestEarned,
       'totalInvested': maturityResult.principalInvested,
       'taxStatus': 'EEE (Exempt-Exempt-Exempt)',
@@ -118,7 +138,7 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
           maturityDate: drift.Value(maturityDate),
           purchasePrice: drift.Value(yearly),
           totalCommittedAmount: drift.Value(maturityResult.principalInvested),
-          currentValuation: drift.Value(maturityResult.maturityAmount),
+          currentValuation: drift.Value(updatedValuation),
           notes: drift.Value(notesData),
         ),
       );
@@ -134,7 +154,7 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
           maturityDate: drift.Value(maturityDate),
           purchasePrice: drift.Value(yearly),
           totalCommittedAmount: drift.Value(maturityResult.principalInvested),
-          currentValuation: maturityResult.maturityAmount,
+          currentValuation: openingBalance,
           notes: drift.Value(notesData),
           createdAt: now,
         ),
@@ -185,12 +205,22 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
               ),
               const Gap(10),
               TextField(
+                controller: _openingBalanceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Opening / Existing Balance (₹)',
+                  hintText: '0 for new PPF, or existing balance if importing',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+              ),
+              const Gap(10),
+              TextField(
                 controller: _yearlyDepositController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onChanged: (_) => _recalculatePreview(),
                 decoration: const InputDecoration(
-                  labelText: 'Annual Contribution (₹ / Year)',
-                  hintText: 'Max ₹1,50,000 per financial year',
+                  labelText: 'Planned Annual Contribution (₹ / Year)',
+                  hintText: 'e.g. ₹1,50,000 per financial year',
                   prefixIcon: Icon(Icons.currency_rupee),
                 ),
               ),

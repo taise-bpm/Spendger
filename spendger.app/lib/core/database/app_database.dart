@@ -531,6 +531,20 @@ class AppDatabase extends _$AppDatabase {
                 .write(AccountsCompanion(currentBalance: Value(newBalance)));
           }
         }
+        if (tx.tag != null && tx.tag!.startsWith('INV:')) {
+          final parts = tx.tag!.split(':');
+          if (parts.length > 1) {
+            final invId = parts[1];
+            final inv = await (select(investments)..where((i) => i.id.equals(invId))).getSingleOrNull();
+            if (inv != null) {
+              await (update(investments)..where((i) => i.id.equals(inv.id))).write(
+                InvestmentsCompanion(
+                  currentValuation: Value((inv.currentValuation - tx.amount).clamp(0.0, double.infinity)),
+                ),
+              );
+            }
+          }
+        }
         await (delete(transactions)..where((t) => t.id.equals(id))).go();
       }
     });
@@ -711,6 +725,8 @@ class AppDatabase extends _$AppDatabase {
     required int financialYearStart,
     required double interestAmount,
     required double updatedClosingBalance,
+    DateTime? transactionDate,
+    String? notes,
   }) async {
     await transaction(() async {
       final inv = await (select(investments)..where((i) => i.id.equals(investmentId))).getSingleOrNull();
@@ -730,14 +746,16 @@ class AppDatabase extends _$AppDatabase {
         );
 
         const uuid = Uuid();
+        final finalDate = transactionDate ?? DateTime(financialYearStart + 1, 3, 31);
+        final defaultNotes = '${inv.name} - Statement Interest Credited for FY $financialYearStart-${(financialYearStart + 1) % 100}';
         await into(transactions).insert(
           TransactionsCompanion.insert(
             id: uuid.v4(),
             categoryId: invCategory.id,
             amount: interestAmount,
             type: 'income',
-            transactionDate: DateTime(financialYearStart + 1, 3, 31),
-            notes: Value('${inv.name} - Statement Interest Credited for FY $financialYearStart-${(financialYearStart + 1) % 100}'),
+            transactionDate: finalDate,
+            notes: Value(notes != null && notes.isNotEmpty ? notes : defaultNotes),
             tag: Value('INV:$investmentId:ppf_interest:fy$financialYearStart'),
             createdAt: DateTime.now(),
           ),
@@ -986,6 +1004,18 @@ class AppDatabase extends _$AppDatabase {
           ..where((p) => p.loanId.equals(loanId))
           ..orderBy([(p) => OrderingTerm(expression: p.installmentNumber)]))
         .watch();
+  }
+
+  Stream<List<EmiPayment>> watchAllPayments() {
+    return (select(emiPayments)
+          ..orderBy([(p) => OrderingTerm(expression: p.paymentDate, mode: OrderingMode.desc)]))
+        .watch();
+  }
+
+  Future<List<EmiPayment>> getAllPayments() {
+    return (select(emiPayments)
+          ..orderBy([(p) => OrderingTerm(expression: p.paymentDate, mode: OrderingMode.desc)]))
+        .get();
   }
 
   Future<Transaction?> getTransactionForEmiPayment(String loanId, int installmentNumber) async {

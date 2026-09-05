@@ -46,6 +46,9 @@ class TransactionTile extends ConsumerWidget {
         ? Colors.lightBlueAccent
         : (category != null ? Color(category!.colorValue) : Colors.grey);
 
+    final isInvestmentTx = transaction.tag?.startsWith('INV:') == true;
+    final isLoanTx = transaction.tag?.startsWith('LOAN:') == true;
+
     final cardContent = Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -56,7 +59,21 @@ class TransactionTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          if (!isTransfer) {
+          if (isInvestmentTx) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Investment deposits and interest entries are managed inside their Investment Studio.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else if (isLoanTx) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Loan EMI payments are managed inside their Loan Details screen.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          } else if (!isTransfer) {
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -149,7 +166,7 @@ class TransactionTile extends ConsumerWidget {
       ),
     );
 
-    if (!isDismissible) {
+    if (!isDismissible || isInvestmentTx || isLoanTx) {
       return cardContent;
     }
 

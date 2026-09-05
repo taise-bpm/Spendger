@@ -13,11 +13,13 @@ import '../../../../core/utils/currency_formatter.dart';
 class RecordPpfDepositDialog extends ConsumerStatefulWidget {
   final Investment ppfInvestment;
   final double currentFyDepositedTotal;
+  final Transaction? existingTransaction;
 
   const RecordPpfDepositDialog({
     super.key,
     required this.ppfInvestment,
     this.currentFyDepositedTotal = 0.0,
+    this.existingTransaction,
   });
 
   @override
@@ -30,6 +32,18 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
 
   DateTime _depositDate = DateTime.now();
   String? _selectedAccountId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingTransaction != null) {
+      final tx = widget.existingTransaction!;
+      _amountController.text = tx.amount.toStringAsFixed(0);
+      _depositDate = tx.transactionDate;
+      _selectedAccountId = tx.accountId;
+      _notesController.text = tx.notes ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -58,13 +72,17 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
       return;
     }
 
-    if (widget.currentFyDepositedTotal + amount > 150000.0) {
+    final isEditing = widget.existingTransaction != null;
+    final previousAmount = isEditing ? widget.existingTransaction!.amount : 0.0;
+    final effectiveFyTotal = widget.currentFyDepositedTotal - previousAmount + amount;
+
+    if (effectiveFyTotal > 150000.0) {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           title: const Text('Exceeds ₹1.5L Annual Limit'),
-          content: Text('Total deposits for this Financial Year will reach ${CurrencyFormatter.format(widget.currentFyDepositedTotal + amount)}, exceeding the ₹1.5 Lakh limit. Deposits beyond ₹1.5L do not earn interest in PPF. Do you still want to proceed?'),
+          content: Text('Total deposits for this Financial Year will reach ${CurrencyFormatter.format(effectiveFyTotal)}, exceeding the ₹1.5 Lakh statutory limit. Deposits beyond ₹1.5L do not earn interest in PPF. Do you still want to proceed?'),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
             ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Proceed Anyway')),
@@ -87,41 +105,80 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
         ? _notesController.text.trim()
         : 'PPF Deposit (${_isBefore5th ? "Earns ${DateFormat('MMM').format(_depositDate)} Interest" : "Interest starts next month"})';
 
-    // 1. Record transaction (expense debit from account)
-    await db.addTransactionWithAccountUpdate(
-      TransactionsCompanion.insert(
-        id: uuid.v4(),
-        categoryId: invCategory.id,
-        accountId: drift.Value(_selectedAccountId),
-        amount: amount,
-        type: 'expense',
-        transactionDate: _depositDate,
-        notes: drift.Value(note),
-        tag: drift.Value(tag),
-        createdAt: DateTime.now(),
-      ),
-    );
-
-    // 2. Update PPF investment current valuation
-    await (db.update(db.investments)..where((i) => i.id.equals(widget.ppfInvestment.id))).write(
-      InvestmentsCompanion(
-        currentValuation: drift.Value(widget.ppfInvestment.currentValuation + amount),
-      ),
-    );
-
-    if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PPF deposit recorded in ledger & account updated!'),
-          backgroundColor: AppColors.ppf,
+    if (isEditing) {
+      final delta = amount - previousAmount;
+      // 1. Update transaction and linked account balance
+      await db.updateTransactionWithAccountUpdate(
+        widget.existingTransaction!,
+        TransactionsCompanion(
+          id: drift.Value(widget.existingTransaction!.id),
+          categoryId: drift.Value(invCategory.id),
+          accountId: drift.Value(_selectedAccountId),
+          amount: drift.Value(amount),
+          type: const drift.Value('expense'),
+          transactionDate: drift.Value(_depositDate),
+          notes: drift.Value(note),
+          tag: drift.Value(widget.existingTransaction!.tag ?? tag),
         ),
       );
+
+      // 2. Adjust PPF investment current valuation by delta
+      await (db.update(db.investments)..where((i) => i.id.equals(widget.ppfInvestment.id))).write(
+        InvestmentsCompanion(
+          currentValuation: drift.Value(widget.ppfInvestment.currentValuation + delta),
+        ),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PPF deposit updated in ledger!'),
+            backgroundColor: AppColors.incomeLight,
+          ),
+        );
+      }
+    } else {
+      // 1. Record transaction (expense debit from account)
+      await db.addTransactionWithAccountUpdate(
+        TransactionsCompanion.insert(
+          id: uuid.v4(),
+          categoryId: invCategory.id,
+          accountId: drift.Value(_selectedAccountId),
+          amount: amount,
+          type: 'expense',
+          transactionDate: _depositDate,
+          notes: drift.Value(note),
+          tag: drift.Value(tag),
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      // 2. Update PPF investment current valuation
+      await (db.update(db.investments)..where((i) => i.id.equals(widget.ppfInvestment.id))).write(
+        InvestmentsCompanion(
+          currentValuation: drift.Value(widget.ppfInvestment.currentValuation + amount),
+        ),
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PPF deposit recorded in ledger & account updated!'),
+            backgroundColor: AppColors.ppf,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isEditing = widget.existingTransaction != null;
+
     final accountsAsync = ref.watch(accountsStreamProvider);
     final accounts = accountsAsync.value ?? [];
 
@@ -131,11 +188,12 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
 
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.shield_outlined, color: AppColors.ppf, size: 24),
-          Gap(8),
-          Text('Deposit into PPF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          const Icon(Icons.shield_outlined, color: AppColors.ppf, size: 24),
+          const Gap(8),
+          Text(isEditing ? 'Edit PPF Deposit' : 'Deposit into PPF',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         ],
       ),
       content: SizedBox(
@@ -152,13 +210,13 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _isBefore5th
-                      ? AppColors.income.withValues(alpha: 0.15)
-                      : AppColors.loan.withValues(alpha: 0.15),
+                      ? (isDark ? AppColors.income.withValues(alpha: 0.15) : Colors.green.shade50)
+                      : (isDark ? AppColors.loan.withValues(alpha: 0.15) : Colors.amber.shade50),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: _isBefore5th
-                        ? AppColors.income.withValues(alpha: 0.3)
-                        : AppColors.loan.withValues(alpha: 0.3),
+                        ? (isDark ? AppColors.income.withValues(alpha: 0.3) : Colors.green.shade300)
+                        : (isDark ? AppColors.loan.withValues(alpha: 0.3) : Colors.amber.shade300),
                   ),
                 ),
                 child: Row(
@@ -178,7 +236,9 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: _isBefore5th ? AppColors.incomeLight : AppColors.loanLight,
+                              color: _isBefore5th
+                                  ? (isDark ? AppColors.incomeLight : Colors.green.shade800)
+                                  : (isDark ? AppColors.loanLight : Colors.brown.shade800),
                             ),
                           ),
                           const Gap(2),
@@ -186,7 +246,10 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
                             _isBefore5th
                                 ? 'Depositing on/before the 5th earns full interest for ${DateFormat('MMMM').format(_depositDate)}!'
                                 : 'Deposited after the 5th. Interest will start accruing from the 1st of next month.',
-                            style: const TextStyle(fontSize: 11, color: Colors.white70),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white70 : Colors.black87,
+                            ),
                           ),
                         ],
                       ),
@@ -212,7 +275,7 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
               // Account Selector
               if (accounts.isNotEmpty) ...[
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedAccountId,
+                  value: _selectedAccountId,
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'Debited from Account',
@@ -295,7 +358,7 @@ class _RecordPpfDepositDialogState extends ConsumerState<RecordPpfDepositDialog>
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.ppf, foregroundColor: Colors.white),
           onPressed: _saveDeposit,
-          child: const Text('Confirm Deposit'),
+          child: Text(isEditing ? 'Save Changes' : 'Confirm Deposit'),
         ),
       ],
     );

@@ -40,9 +40,16 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     final loansAsync = ref.watch(loansStreamProvider('active'));
+    final paymentsAsync = ref.watch(allLoanPaymentsStreamProvider);
     final loans = loansAsync.value ?? [];
+    final payments = paymentsAsync.value ?? [];
 
-    final double totalActiveDebt = loans.fold(0.0, (sum, l) => sum + l.principalAmount);
+    final double totalOutstandingDebt = loans.fold(0.0, (sum, l) {
+      final paidPrincipal = payments
+          .where((p) => p.loanId == l.id)
+          .fold(0.0, (pSum, p) => pSum + p.principalPaid);
+      return sum + (l.principalAmount - paidPrincipal).clamp(0.0, l.principalAmount);
+    });
     final double totalMonthlyEmi = loans.fold(0.0, (sum, l) => sum + l.monthlyEmi);
     final isCompareTab = _tabController.index == 1;
 
@@ -88,7 +95,7 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
         controller: _tabController,
         children: [
           // Tab 1: Active Loans List & Summary
-          _buildActiveLoansTab(context, ref, loans, totalActiveDebt, totalMonthlyEmi),
+          _buildActiveLoansTab(context, ref, loans, payments, totalOutstandingDebt, totalMonthlyEmi),
 
           // Tab 2: Compare & Mock Studio
           const LoanComparisonStudioTab(),
@@ -121,7 +128,8 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
     BuildContext context,
     WidgetRef ref,
     List<EmiLoan> loans,
-    double totalActiveDebt,
+    List<EmiPayment> payments,
+    double totalOutstandingDebt,
     double totalMonthlyEmi,
   ) {
     final theme = Theme.of(context);
@@ -156,14 +164,14 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'ACTIVE PRINCIPAL',
+                          'OUTSTANDING PRINCIPAL',
                           style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
                         const Gap(4),
                         Text(
-                          CurrencyFormatter.format(totalActiveDebt),
+                          CurrencyFormatter.format(totalOutstandingDebt),
                           style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
@@ -228,6 +236,10 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
                   itemBuilder: (context, index) {
                     final loan = loans[index];
                     final isFriendLoan = loan.loanCategory == 'friend_family' || loan.annualInterestRate == 0;
+                    final loanPaidPrincipal = payments
+                        .where((p) => p.loanId == loan.id)
+                        .fold(0.0, (pSum, p) => pSum + p.principalPaid);
+                    final outstanding = (loan.principalAmount - loanPaidPrincipal).clamp(0.0, loan.principalAmount);
 
                     final categoryTag = switch (loan.loanCategory) {
                       'personal_bank' => 'Personal Loan',
@@ -319,8 +331,9 @@ class _EmiLoansScreenState extends ConsumerState<EmiLoansScreen> with SingleTick
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
+                                  _buildInfoItem('Outstanding', CurrencyFormatter.formatCompact(outstanding)),
                                   _buildInfoItem('Principal', CurrencyFormatter.formatCompact(loan.principalAmount)),
-                                  _buildInfoItem('Interest Rate', isFriendLoan ? '0% (Interest-Free)' : '${loan.annualInterestRate}% p.a.'),
+                                  _buildInfoItem('Rate', isFriendLoan ? '0%' : '${loan.annualInterestRate}%'),
                                   _buildInfoItem('Tenure', '${loan.tenureMonths} Mo'),
                                   const Row(
                                     children: [

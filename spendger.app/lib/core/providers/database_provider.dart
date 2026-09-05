@@ -80,6 +80,11 @@ final loanPaymentsStreamProvider = StreamProvider.autoDispose.family<List<EmiPay
   return db.watchPaymentsForLoan(loanId);
 });
 
+final allLoanPaymentsStreamProvider = StreamProvider.autoDispose<List<EmiPayment>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchAllPayments();
+});
+
 final loanComparisonsStreamProvider = StreamProvider.autoDispose<List<LoanComparison>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchLoanComparisons();
