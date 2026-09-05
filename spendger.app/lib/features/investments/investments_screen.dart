@@ -35,6 +35,9 @@ class InvestmentsScreen extends ConsumerWidget {
     final investmentsAsync = ref.watch(investmentsStreamProvider(null));
     final allInvestments = investmentsAsync.value ?? [];
 
+    final transactionsAsync = ref.watch(allTransactionsProvider);
+    final allTx = transactionsAsync.value ?? [];
+
     final activeInvestments = allInvestments.where((i) => i.status != 'matured' && i.status != 'closed').toList();
     final maturedInvestments = allInvestments.where((i) => i.status == 'matured' || i.status == 'closed').toList();
 
@@ -46,7 +49,14 @@ class InvestmentsScreen extends ConsumerWidget {
     final chittyList = activeInvestments.where((i) => i.type == 'chitty').toList();
     final goldList = activeInvestments.where((i) => i.type == 'gold').toList();
 
-    final double totalActiveValuation = activeInvestments.fold(0.0, (sum, i) => sum + i.currentValuation);
+    final double ppfValuation = ppfList.fold(0.0, (sum, i) => sum + i.currentValuation);
+    final double fdValuation = fdList.fold(0.0, (sum, i) => sum + _getLiveFdValuation(i, allTx));
+    final double rdValuation = rdList.fold(0.0, (sum, i) => sum + _getLiveRdValuation(i, allTx));
+    final double sipValuation = sipList.fold(0.0, (sum, i) => sum + i.currentValuation);
+    final double chittyValuation = chittyList.fold(0.0, (sum, i) => sum + i.currentValuation);
+    final double goldValuation = goldList.fold(0.0, (sum, i) => sum + i.currentValuation);
+
+    final double totalActiveValuation = ppfValuation + fdValuation + rdValuation + sipValuation + chittyValuation + goldValuation;
     final double totalCommittedCapital = activeInvestments.fold(0.0, (sum, i) => sum + (i.totalCommittedAmount ?? i.purchasePrice ?? 0.0));
 
     return Scaffold(
@@ -288,7 +298,7 @@ class InvestmentsScreen extends ConsumerWidget {
                 icon: Icons.account_balance,
                 color: AppColors.fd,
                 activeCount: fdList.length,
-                totalValuation: fdList.fold(0.0, (sum, i) => sum + i.currentValuation),
+                totalValuation: fdValuation,
                 isDark: isDark,
                 onTap: () {
                   _navigateOrAdd(context, fdList, () => const AddFdDialog(), (inv) => FdStudioScreen(fdInvestment: inv));
@@ -304,7 +314,7 @@ class InvestmentsScreen extends ConsumerWidget {
                 icon: Icons.repeat,
                 color: AppColors.rd,
                 activeCount: rdList.length,
-                totalValuation: rdList.fold(0.0, (sum, i) => sum + i.currentValuation),
+                totalValuation: rdValuation,
                 isDark: isDark,
                 onTap: () {
                   _navigateOrAdd(context, rdList, () => const AddRdDialog(), (inv) => RdStudioScreen(rdInvestment: inv));
@@ -582,5 +592,24 @@ class InvestmentsScreen extends ConsumerWidget {
         ),
       );
     }
+  }
+
+  double _getLiveFdValuation(Investment fd, List<Transaction> allTx) {
+    final fdTx = allTx.where((t) => t.tag != null && t.tag!.startsWith('INV:${fd.id}:')).toList();
+    final principal = fd.purchasePrice ?? (fd.totalCommittedAmount ?? fd.currentValuation);
+    final interest = fdTx
+        .where((t) => t.type == 'income' && (t.tag!.contains('interest_payout') || t.tag!.contains('fd_interest')))
+        .fold(0.0, (sum, t) => sum + t.amount);
+    return principal > 0 ? (principal + interest) : fd.currentValuation;
+  }
+
+  double _getLiveRdValuation(Investment rd, List<Transaction> allTx) {
+    final rdTx = allTx.where((t) => t.tag != null && t.tag!.startsWith('INV:${rd.id}:')).toList();
+    final deposits = rdTx.where((t) => t.type == 'expense').fold(0.0, (sum, t) => sum + t.amount);
+    final interest = rdTx.where((t) => t.type == 'income').fold(0.0, (sum, t) => sum + t.amount);
+    if (deposits > 0 || interest > 0) {
+      return deposits + interest;
+    }
+    return rd.status == 'matured' || rd.status == 'closed' ? rd.currentValuation : 0.0;
   }
 }

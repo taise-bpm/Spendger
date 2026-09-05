@@ -43,10 +43,10 @@ class InvestmentDetailsScreen extends ConsumerWidget {
       } catch (_) {}
     }
 
-    final double annualRate = (notesData['rate'] as num?)?.toDouble() ?? 0.0;
-    final int tenureMonths = (notesData['tenureMonths'] as num?)?.toInt() ?? 12;
-    final int tenureYears = (notesData['tenureYears'] as num?)?.toInt() ?? 15;
-    final int compounding = (notesData['compounding'] as num?)?.toInt() ?? 4;
+    final double annualRate = double.tryParse(notesData['rate']?.toString() ?? '') ?? 0.0;
+    final int tenureMonths = int.tryParse(notesData['tenureMonths']?.toString() ?? '') ?? 12;
+    final int tenureYears = int.tryParse(notesData['tenureYears']?.toString() ?? '') ?? 15;
+    final int compounding = int.tryParse(notesData['compounding']?.toString() ?? '') ?? 4;
 
     // Generate schedule based on investment type
     final List<InvestmentScheduleItem> schedule = switch (currentInv.type) {
@@ -70,7 +70,7 @@ class InvestmentDetailsScreen extends ConsumerWidget {
       'fd' => FinancialMath.generateFdSchedule(
           principal: currentInv.purchasePrice ?? 0.0,
           annualInterestRate: annualRate,
-          tenureYears: (notesData['tenureYears'] as num?)?.toDouble() ?? 1.0,
+          tenureYears: double.tryParse(notesData['tenureYears']?.toString() ?? '') ?? 1.0,
           compoundingFrequency: compounding,
           startDate: currentInv.startDate,
         ),

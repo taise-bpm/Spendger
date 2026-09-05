@@ -309,6 +309,39 @@ void main() {
       expect(ledger.first.type, equals('income'));
     });
 
+    test('postRdInterest updates RD current valuation and logs quarterly interest transaction', () async {
+      const uuid = Uuid();
+      final rdId = uuid.v4();
+
+      await db.into(db.investments).insert(
+        InvestmentsCompanion.insert(
+          id: rdId,
+          name: 'HDFC Recurring Deposit',
+          type: 'rd',
+          startDate: DateTime(2025, 4, 1),
+          purchasePrice: const drift.Value(5000.0),
+          totalCommittedAmount: const drift.Value(60000.0),
+          currentValuation: 15000.0, // 3 installments deposited
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      await db.postRdInterest(
+        investmentId: rdId,
+        investmentName: 'HDFC Recurring Deposit',
+        interestAmount: 265.0,
+        date: DateTime(2025, 6, 30),
+      );
+
+      final inv = (await db.getAllInvestments()).firstWhere((i) => i.id == rdId);
+      expect(inv.currentValuation, equals(15265.0));
+
+      final ledger = await db.watchInvestmentTransactions(investmentId: rdId).first;
+      expect(ledger.length, equals(1));
+      expect(ledger.first.amount, equals(265.0));
+      expect(ledger.first.type, equals('income'));
+    });
+
     test('createLoanWithDisbursal inserts loan, credits bank account with net funds, and rollbacks on delete', () async {
       final accounts = await db.getAllAccounts();
       final bankAcc = accounts.firstWhere((a) => a.accountType == 'bank');

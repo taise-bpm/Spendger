@@ -9,6 +9,7 @@ import '../../../core/providers/database_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/icon_helper.dart';
 import 'quick_add_sheet.dart';
+import 'transaction_details_sheet.dart';
 
 class TransactionTile extends ConsumerWidget {
   final Transaction transaction;
@@ -47,7 +48,9 @@ class TransactionTile extends ConsumerWidget {
         : (category != null ? Color(category!.colorValue) : Colors.grey);
 
     final isInvestmentTx = transaction.tag?.startsWith('INV:') == true;
-    final isLoanTx = transaction.tag?.startsWith('LOAN:') == true;
+    final isLoanTx = transaction.tag?.startsWith('LOAN:') == true ||
+        transaction.tag?.startsWith('LOAN_DISBURSE:') == true ||
+        transaction.tag?.startsWith('LOAN_PAYMENT:') == true;
 
     final cardContent = Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -59,28 +62,17 @@ class TransactionTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: () {
-          if (isInvestmentTx) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Investment deposits and interest entries are managed inside their Investment Studio.'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else if (isLoanTx) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Loan EMI payments are managed inside their Loan Details screen.'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          } else if (!isTransfer) {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => QuickAddSheet(transactionToEdit: transaction),
-            );
-          }
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => TransactionDetailsSheet(
+              transaction: transaction,
+              category: category,
+              account: account,
+              toAccount: toAccount,
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(12),

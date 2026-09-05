@@ -55,7 +55,9 @@ class _AddFdDialogState extends ConsumerState<AddFdDialog> {
         try {
           final notesData = jsonDecode(inv.notes!);
           if (notesData['rate'] != null) _rateController.text = notesData['rate'].toString();
-          if (notesData['compounding'] != null) _compoundingFrequency = notesData['compounding'] as int;
+          if (notesData['compounding'] != null) {
+            _compoundingFrequency = int.tryParse(notesData['compounding'].toString()) ?? 4;
+          }
         } catch (_) {}
       }
     }
@@ -134,9 +136,9 @@ class _AddFdDialogState extends ConsumerState<AddFdDialog> {
     final notesData = jsonEncode({
       'rate': rate,
       'compounding': _compoundingFrequency,
-      'tenureYears': _tenureYearsController.text.trim(),
-      'tenureMonths': _tenureMonthsController.text.trim(),
-      'tenureDays': _tenureDaysController.text.trim(),
+      'tenureYears': int.tryParse(_tenureYearsController.text.trim()) ?? 0,
+      'tenureMonths': int.tryParse(_tenureMonthsController.text.trim()) ?? 0,
+      'tenureDays': int.tryParse(_tenureDaysController.text.trim()) ?? 0,
       'interestEarned': maturityResult.totalInterestEarned,
     });
 

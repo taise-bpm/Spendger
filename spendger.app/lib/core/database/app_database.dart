@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -764,6 +765,219 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// Post Quarterly / Periodic Interest to Recurring Deposit
+  Future<void> postRdInterest({
+    required String investmentId,
+    required String investmentName,
+    required double interestAmount,
+    required DateTime date,
+    String? destinationAccountId,
+    String? note,
+  }) async {
+    await transaction(() async {
+      final inv = await (select(investments)..where((i) => i.id.equals(investmentId))).getSingleOrNull();
+      if (inv != null) {
+        // 1. Update investment current valuation (add interest to live valuation)
+        final newCurrentVal = inv.currentValuation + interestAmount;
+        await (update(investments)..where((i) => i.id.equals(investmentId))).write(
+          InvestmentsCompanion(
+            currentValuation: Value(newCurrentVal),
+          ),
+        );
+
+        // 2. Record interest transaction
+        final categories = await getAllCategories(type: 'income');
+        final invCategory = categories.firstWhere(
+          (c) => c.name.toLowerCase().contains('investment') || c.name.toLowerCase().contains('return'),
+          orElse: () => categories.first,
+        );
+
+        const uuid = Uuid();
+        final defaultNote = '$investmentName - Quarterly Interest Credited';
+        final tag = 'INV:$investmentId:rd_interest:${date.year}_${date.month}';
+
+        if (destinationAccountId != null && destinationAccountId.isNotEmpty) {
+          // Credited directly to bank account
+          await addTransactionWithAccountUpdate(
+            TransactionsCompanion.insert(
+              id: uuid.v4(),
+              categoryId: invCategory.id,
+              accountId: Value(destinationAccountId),
+              amount: interestAmount,
+              type: 'income',
+              transactionDate: date,
+              notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
+              tag: Value(tag),
+              createdAt: DateTime.now(),
+            ),
+          );
+        } else {
+          // Compounded inside RD account (internal passbook growth)
+          await into(transactions).insert(
+            TransactionsCompanion.insert(
+              id: uuid.v4(),
+              categoryId: invCategory.id,
+              amount: interestAmount,
+              type: 'income',
+              transactionDate: date,
+              notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
+              tag: Value(tag),
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  /// Record Chitty Auction Prize Money Payout to Bank Account
+  Future<void> recordChittyPrizePayout({
+    required String investmentId,
+    required String investmentName,
+    required String destinationAccountId,
+    required double amount,
+    required DateTime date,
+    String? note,
+  }) async {
+    final categories = await getAllCategories(type: 'income');
+    final invCategory = categories.firstWhere(
+      (c) => c.name.toLowerCase().contains('investment') || c.name.toLowerCase().contains('return'),
+      orElse: () => categories.first,
+    );
+
+    const uuid = Uuid();
+    final defaultNote = '$investmentName - Auction Prize Money Received';
+
+    await addTransactionWithAccountUpdate(
+      TransactionsCompanion.insert(
+        id: uuid.v4(),
+        categoryId: invCategory.id,
+        accountId: Value(destinationAccountId),
+        amount: amount,
+        type: 'income',
+        transactionDate: date,
+        notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
+        tag: Value('INV:$investmentId:prize_payout'),
+        createdAt: DateTime.now(),
+      ),
+    );
+  }
+
+  /// Clear / Reset Prize Money Declaration and reverse any disbursed prize transaction
+  Future<void> clearChittyPrizeDeclaration(String investmentId) async {
+    await transaction(() async {
+      // 1. Delete linked prize payout transaction if any was recorded in the ledger
+      final prizeTx = await (select(transactions)..where((t) => t.tag.equals('INV:$investmentId:prize_payout'))).getSingleOrNull();
+      if (prizeTx != null) {
+        await deleteTransactionWithAccountUpdate(prizeTx.id);
+      }
+
+      // 2. Reset prized flag and prize amount on chitty installments
+      await (update(chittyInstallments)..where((c) => c.investmentId.equals(investmentId) & c.isPrizedMonth.equals(true))).write(
+        const ChittyInstallmentsCompanion(
+          isPrizedMonth: Value(false),
+          prizeAmountReceived: Value(0.0),
+        ),
+      );
+
+      // 3. Clear prize metadata from investment notes
+      final inv = await (select(investments)..where((i) => i.id.equals(investmentId))).getSingleOrNull();
+      if (inv?.notes != null) {
+        try {
+          final notesData = jsonDecode(inv!.notes!) as Map<String, dynamic>;
+          notesData.remove('isPrized');
+          notesData.remove('prizedMonth');
+          notesData.remove('prizeAmount');
+          notesData.remove('prizeOption');
+          notesData.remove('prizeDisbursed');
+          notesData.remove('fdInterestMonthly');
+          await (update(investments)..where((i) => i.id.equals(investmentId))).write(
+            InvestmentsCompanion(notes: Value(jsonEncode(notesData))),
+          );
+        } catch (_) {}
+      }
+    });
+  }
+
+  /// Revert a recorded Chitty installment back to unpaid status
+  Future<void> revertChittyInstallment(String installmentId) async {
+    await transaction(() async {
+      final inst = await (select(chittyInstallments)..where((c) => c.id.equals(installmentId))).getSingleOrNull();
+      if (inst == null) return;
+
+      // 1. If this was the prized month, clear prize declaration
+      if (inst.isPrizedMonth) {
+        await clearChittyPrizeDeclaration(inst.investmentId);
+      }
+
+      // 2. Revert installment to unpaid
+      await (update(chittyInstallments)..where((c) => c.id.equals(installmentId))).write(
+        const ChittyInstallmentsCompanion(
+          isPaid: Value(false),
+          netAmountPaid: Value(0.0),
+          dividendEarned: Value(0.0),
+          paymentDate: Value(null),
+          isPrizedMonth: Value(false),
+          prizeAmountReceived: Value(0.0),
+        ),
+      );
+
+      // 3. Recalculate and update currentValuation on investment
+      final allInst = await (select(chittyInstallments)..where((c) => c.investmentId.equals(inst.investmentId))).get();
+      final totalPaidSoFar = allInst.where((c) => c.isPaid && c.id != installmentId).fold(0.0, (sum, c) => sum + c.netAmountPaid);
+
+      await (update(investments)..where((i) => i.id.equals(inst.investmentId))).write(
+        InvestmentsCompanion(currentValuation: Value(totalPaidSoFar)),
+      );
+    });
+  }
+
+  /// Mature / Close a Chitty with Net Payout to Bank Account
+  Future<void> matureChittyWithPayout({
+    required String investmentId,
+    required String investmentName,
+    required String? destinationAccountId,
+    required double payoutAmount,
+    required DateTime date,
+    String? note,
+  }) async {
+    await transaction(() async {
+      // 1. Mark investment as matured
+      await (update(investments)..where((i) => i.id.equals(investmentId))).write(
+        const InvestmentsCompanion(
+          status: Value('matured'),
+          currentValuation: Value(0.0),
+        ),
+      );
+
+      // 2. If payout amount > 0 and destination account provided, credit bank account
+      if (payoutAmount > 0 && destinationAccountId != null && destinationAccountId.isNotEmpty) {
+        final categories = await getAllCategories(type: 'income');
+        final invCategory = categories.firstWhere(
+          (c) => c.name.toLowerCase().contains('investment') || c.name.toLowerCase().contains('return'),
+          orElse: () => categories.first,
+        );
+
+        const uuid = Uuid();
+        final defaultNote = '$investmentName - Chitty Maturity Payout';
+
+        await addTransactionWithAccountUpdate(
+          TransactionsCompanion.insert(
+            id: uuid.v4(),
+            categoryId: invCategory.id,
+            accountId: Value(destinationAccountId),
+            amount: payoutAmount,
+            type: 'income',
+            transactionDate: date,
+            notes: Value(note?.isNotEmpty == true ? note! : defaultNote),
+            tag: Value('INV:$investmentId:maturity_payout'),
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+    });
+  }
+
   // Budgets
   Stream<List<Budget>> watchBudgetsForMonth(int year, int month) {
     return (select(budgets)..where((b) => b.periodYear.equals(year) & b.periodMonth.equals(month))).watch();
@@ -1137,6 +1351,14 @@ class AppDatabase extends _$AppDatabase {
       query.where((i) => i.type.equals(type));
     }
     return query.get();
+  }
+
+  Future<Investment?> getInvestmentById(String id) {
+    return (select(investments)..where((i) => i.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<EmiLoan?> getLoanById(String id) {
+    return (select(emiLoans)..where((l) => l.id.equals(id))).getSingleOrNull();
   }
 
   Future<void> updateInvestment(String id, InvestmentsCompanion companion) async {

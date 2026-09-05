@@ -126,7 +126,7 @@ class _PostPpfInterestDialogState extends ConsumerState<PostPpfInterestDialog> {
         notesData = jsonDecode(widget.ppfInvestment.notes!);
       } catch (_) {}
     }
-    final double storedOpeningBalance = (notesData['openingBalance'] as num?)?.toDouble() ?? 0.0;
+    final double storedOpeningBalance = double.tryParse(notesData['openingBalance']?.toString() ?? '') ?? 0.0;
 
     final pastDepositsTx = _allTx.where((t) {
       return t.type == 'expense' && t.transactionDate.isBefore(fyStartDate);

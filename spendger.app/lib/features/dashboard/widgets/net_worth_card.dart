@@ -69,9 +69,9 @@ class _NetWorthCardState extends ConsumerState<NetWorthCard> {
         } catch (_) {}
       }
 
-      final double rate = (notesData['rate'] as num?)?.toDouble() ?? 0.0;
-      final int tenureMonths = (notesData['tenureMonths'] as num?)?.toInt() ?? 12;
-      final int tenureYears = (notesData['tenureYears'] as num?)?.toInt() ?? 15;
+      final double rate = _parseDouble(notesData['rate'], 0.0);
+      final int tenureMonths = _parseInt(notesData['tenureMonths'], 12);
+      final int tenureYears = _parseInt(notesData['tenureYears'], 15);
 
       switch (inv.type.toLowerCase()) {
         case 'rd':
@@ -475,5 +475,17 @@ class _NetWorthCardState extends ConsumerState<NetWorthCard> {
         ),
       ],
     );
+  }
+
+  double _parseDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString()) ?? fallback;
+  }
+
+  int _parseInt(dynamic val, [int fallback = 0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toInt();
+    return int.tryParse(val.toString()) ?? fallback;
   }
 }

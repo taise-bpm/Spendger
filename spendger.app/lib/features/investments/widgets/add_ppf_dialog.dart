@@ -45,7 +45,8 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
           if (notesData['rate'] != null) _rateController.text = notesData['rate'].toString();
           if (notesData['tenureYears'] != null) _tenureYearsController.text = notesData['tenureYears'].toString();
           if (notesData['openingBalance'] != null) {
-            _openingBalanceController.text = (notesData['openingBalance'] as num).toDouble().toStringAsFixed(0);
+            final parsedBal = double.tryParse(notesData['openingBalance'].toString()) ?? 0.0;
+            _openingBalanceController.text = parsedBal.toStringAsFixed(0);
           } else {
             _openingBalanceController.text = inv.currentValuation.toStringAsFixed(0);
           }
@@ -112,7 +113,7 @@ class _AddPpfDialogState extends ConsumerState<AddPpfDialog> {
     if (widget.investmentToEdit?.notes != null) {
       try {
         final oldNotes = jsonDecode(widget.investmentToEdit!.notes!);
-        oldOpeningBalance = (oldNotes['openingBalance'] as num?)?.toDouble() ?? 0.0;
+        oldOpeningBalance = double.tryParse(oldNotes['openingBalance']?.toString() ?? '') ?? 0.0;
       } catch (_) {}
     }
     final deltaOpening = openingBalance - oldOpeningBalance;

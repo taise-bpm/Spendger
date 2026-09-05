@@ -123,7 +123,7 @@ class _PpfStudioScreenState extends ConsumerState<PpfStudioScreen> with SingleTi
         notesData = jsonDecode(currentInv.notes!);
       } catch (_) {}
     }
-    final double storedOpeningBalance = (notesData['openingBalance'] as num?)?.toDouble() ?? 0.0;
+    final double storedOpeningBalance = double.tryParse(notesData['openingBalance']?.toString() ?? '') ?? 0.0;
 
     // Deposits & interest before this selected FY for accurate opening balance
     final pastDepositsTx = allTx.where((t) {
@@ -1340,8 +1340,8 @@ class _PpfStudioScreenState extends ConsumerState<PpfStudioScreen> with SingleTi
       } catch (_) {}
     }
 
-    final double annualRate = (notesData['rate'] as num?)?.toDouble() ?? 7.1;
-    final int tenureYears = (notesData['tenureYears'] as num?)?.toInt() ?? 15;
+    final double annualRate = double.tryParse(notesData['rate']?.toString() ?? '') ?? 7.1;
+    final int tenureYears = int.tryParse(notesData['tenureYears']?.toString() ?? '') ?? 15;
     final double yearlyDeposit = currentInv.purchasePrice ?? 150000.0;
 
     final schedule = FinancialMath.generatePpfSchedule(
